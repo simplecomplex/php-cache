@@ -70,7 +70,7 @@ class CacheBroker
     public function getStore(string $name, array $storeConstructorArgs = []) : CacheInterface
     {
         if (!$this->nameValidate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name[' . $name . '].');
+            throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         if (isset($this->stores[$name])) {
             return $this->stores[$name];
@@ -94,7 +94,7 @@ class CacheBroker
     public function hasStore(string $name) : bool
     {
         if (!$this->nameValidate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name[' . $name . '].');
+            throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         return isset($this->stores[$name]);
     }
@@ -111,26 +111,40 @@ class CacheBroker
     public function registerStore(string $name, CacheInterface $store) : bool
     {
         if (!$this->nameValidate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name[' . $name . '].');
+            throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         $this->stores[$name] = $store;
         return true;
     }
 
     /**
-     * Checks that stringified key is non-empty and only contains legal chars.
+     * Legal non-alphanumeric characters of a store name.
+     *
+     * Rules like PSR-16 minimum requirements for cache key:
+     * - chars: a-zA-Z\d_.
+     * - length: >=2 <=64
+     */
+    const NAME_VALID_NON_ALPHANUM = [
+        '_',
+        '.',
+    ];
+
+    /**
+     * Checks that key is non-empty and only contains legal chars.
      *
      * @param string $name
      *      Allows alphanum, underscore and hyphen.
+     *      Min. length 2, max. length 64.
      *
      * @return bool
      */
     public function nameValidate(string $name) : bool
     {
-        if (!$name && $name === '') {
+        $le = strlen($name);
+        if ($le < 2 || $le > 64) {
             return false;
         }
         // Faster than a regular expression.
-        return !!ctype_alnum('A' . str_replace(['_', '-'], '', $name));
+        return !!ctype_alnum('A' . str_replace(static::NAME_VALID_NON_ALPHANUM, '', $name));
     }
 }
