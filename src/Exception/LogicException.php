@@ -7,7 +7,7 @@ namespace SimpleComplex\Cache\Exception;
  *
  * Please do not use - throw - in code of another package/library.
  *
- * @package SimpleComplex\Utils
+ * @package SimpleComplex\Cache
  */
 class LogicException extends \LogicException
 {
