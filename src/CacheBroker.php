@@ -10,15 +10,82 @@ declare(strict_types=1);
 namespace SimpleComplex\Cache;
 
 use Psr\SimpleCache\CacheInterface;
+use SimpleComplex\Utils\Explorable;
+use SimpleComplex\Utils\Exception\RuntimeException;
+use SimpleComplex\Utils\Exception\OutOfBoundsException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
 
 /**
- * Cache broker.
+ * Cache broker is an abstraction of actual CacheInterface classes/instances,
+ * allowing change of cache implementation and medium without consequences
+ * to code using the CacheBroker.
+ *
+ * All registered stores are accessible via 'magic' getters.
+ * @property-read CacheInterface *
  *
  * @package SimpleComplex\Cache
  */
-class CacheBroker
+class CacheBroker extends Explorable
 {
+    // Explorable.--------------------------------------------------------------
+
+    protected $explorableIndex = [];
+
+    /**
+     * Retrieves a store.
+     *
+     * @param string $name
+     *
+     * @return CacheInterface
+     *
+     * @throws OutOfBoundsException
+     *      If no such instance property.
+     */
+    public function __get(string $name)
+    {
+        if (isset($this->stores[$name])) {
+            return $this->stores[$name];
+        }
+        throw new OutOfBoundsException(get_class($this) . ' instance has no store[' . $name . '].');
+    }
+
+    /**
+     * All stores are read-only.
+     *
+     * @param string $name
+     * @param mixed|null $value
+     *
+     * @return void
+     *
+     * @throws OutOfBoundsException
+     *      If no such instance property.
+     * @throws RuntimeException
+     *      If such instance property declared.
+     */
+    public function __set(string $name, $value) /*: void*/
+    {
+        switch ($name) {
+            case 'stores':
+                throw new RuntimeException(get_class($this) . ' instance store[' . $name . '] is read-only.');
+        }
+        throw new OutOfBoundsException(get_class($this) . ' instance has no store[' . $name . '].');
+    }
+
+    /**
+     * @see \Iterator::current()
+     * @see Explorable::current()
+     *
+     * @return mixed
+     */
+    public function current()
+    {
+        // Override to facilitate direct call to __get(); cheaper.
+        return $this->__get(current($this->explorableIndex));
+    }
+
+
+    // Business.----------------------------------------------------------------
+
     /**
      * Reference to first object instantiated via the getInstance() method,
      * no matter which parent/child class the method was/is called on.
@@ -44,9 +111,11 @@ class CacheBroker
     }
 
     /**
-     * @var string
+     * @var string[]
      */
-    const CLASS_TYPE_FILE = FileCache::class;
+    const CLASS_BY_TYPE = [
+        'file' => FileCache::class,
+    ];
 
     /**
      * @var array
@@ -78,7 +147,7 @@ class CacheBroker
         $args = $storeConstructorArgs ? $storeConstructorArgs : [
             $name,
         ];
-        $class = static::CLASS_TYPE_FILE;
+        $class = static::CLASS_BY_TYPE['file'];
         $this->stores[$name] = $store = new $class(...$args);
         return $store;
     }
@@ -114,6 +183,7 @@ class CacheBroker
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         $this->stores[$name] = $store;
+        $this->explorableIndex[] = $name;
         return true;
     }
 

@@ -1,0 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-06-06
+-----------------------------------
+- CacheBroker is now Utils\Explorable, listing registered cache stores.
+
+SimpleComplex/Cache 1.x, 2017-05-31
+-----------------------------------
+- Initial.

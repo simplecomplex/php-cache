@@ -224,7 +224,8 @@ class FileCache extends Explorable implements CacheInterface
      * @throws OutOfBoundsException
      *      If no such instance property.
      */
-    public function __get($name) {
+    public function __get($name)
+    {
         switch ($name) {
             case 'name':
             case 'type':
@@ -236,14 +237,14 @@ class FileCache extends Explorable implements CacheInterface
 
     /**
      * @param string $name
-     * @param mixed $value
+     * @param mixed|null $value
      *
      * @return void
      *
      * @throws OutOfBoundsException
      *      If no such instance property.
      * @throws RuntimeException
-     *      If such instance property declared.
+     *      If that instance property is read-only.
      */
     public function __set(string $name, $value) /*: void*/
     {
@@ -276,10 +277,11 @@ class FileCache extends Explorable implements CacheInterface
      *
      * @var string
      */
-    const PATH_PARENT_DEFAULT = '../private/simplecomplex/file-cache';
+    const PATH_PARENT_DEFAULT = '../private/lib/simplecomplex/file-cache';
 
     // @todo: /stores
     // @todo: /tmp  - for rename()ing
+    // @todo: /stores.json
 
     /**
      * File mode used when creating directory.
@@ -501,7 +503,7 @@ class FileCache extends Explorable implements CacheInterface
                         + ($ttl->h * 60 * 60)
                         + ($ttl->i * 60)
                         + $ttl->s
-                    ) * (!$ttl->invert);
+                    ) * (!$ttl->invert ? 1 : -1);
                 if ($secs < 0) {
                     throw new RuntimeException('Time-to-live cannot be negative, saw DateInterval['
                         . join(', ', array(
