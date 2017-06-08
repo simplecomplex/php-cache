@@ -1,9 +1,9 @@
 {
-    "name": "simplecomplex/file-cache",
+    "name": "simplecomplex/cache",
     "type": "library",
     "description": "File-based PSR-16 Simple Cache implementation.",
     "keywords": ["PSR-16", "simple cache"],
-    "homepage": "https://github.com/simplecomplex/php-filecache",
+    "homepage": "https://github.com/simplecomplex/php-cache",
     "license": "MIT",
     "authors": [
         {
@@ -19,8 +19,8 @@
     },
     "autoload": {
         "psr-4": {
-            "SimpleComplex\\FileCache\\": "src/",
-            "SimpleComplex\\FileCache\\Exception\\": "src/Exception/"
+            "SimpleComplex\\Cache\\": "src/",
+            "SimpleComplex\\Cache\\Exception\\": "src/Exception/"
         }
     }
 }
