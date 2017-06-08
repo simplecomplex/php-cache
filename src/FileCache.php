@@ -11,6 +11,7 @@ namespace SimpleComplex\Cache;
 
 use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
+use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\Exception\CacheInvalidArgumentException;
@@ -275,6 +276,18 @@ class FileCache extends Explorable implements CacheInterface
     /**
      * Relative path is relative to document root.
      *
+     * Will contain:
+     * - /stores/[some store name]/[...caches]
+     * - /tmp
+     * - [some store name].json
+     *
+     * @var string
+     */
+    const PATH = '../private/lib/simplecomplex/file-cache';
+
+    /**
+     * Relative path is relative to document root.
+     *
      * @var string
      */
     const PATH_PARENT_DEFAULT = '../private/lib/simplecomplex/file-cache';
@@ -407,6 +420,153 @@ class FileCache extends Explorable implements CacheInterface
     public function nameValidate(string $name) : bool
     {
         return $this->keyValidate($name);
+    }
+
+    /**
+     * Ensures this class' (writable) path, tmp dir and stores dir.
+     *
+     * @return void
+     *
+     * @throws ConfigurationException
+     *      If document root cannot be determined.
+     * @throws LogicException
+     *      Algo or configuration error, can't determine whether path is
+     *      absolute or relative.
+     */
+    protected function path() /*: void*/
+    {
+        $path = static::PATH;
+        // Absolute.
+        if (
+            strpos($path, '/') !== 0
+            && (DIRECTORY_SEPARATOR === '/' || strpos($path, ':') !== 1)
+        ) {
+            // Document root.
+            if (!empty($_SERVER['DOCUMENT_ROOT'])) {
+                $doc_root = $_SERVER['DOCUMENT_ROOT'];
+                if (DIRECTORY_SEPARATOR == '/') {
+                    $doc_root = str_replace('\\', '/', $doc_root);
+                }
+            } elseif (CliEnvironment::cli()) {
+                $doc_root = (new CliEnvironment())->documentRoot;
+                if (!$doc_root) {
+                    throw new ConfigurationException(
+                        'Cannot resolve document root, probably no .document_root file in document root.');
+                }
+            } else {
+                throw new ConfigurationException(
+                    'Cannot resolve document root, _SERVER[DOCUMENT_ROOT] non-existent or empty.');
+            }
+            // Relative above document root.
+            if (strpos($path, '../') === 0) {
+                $path = dirname($doc_root) . substr($path, 2);
+            }
+            // Relative to self of document root.
+            elseif (strpos($path, './') === 0) {
+                $path = $doc_root . substr($path, 1);
+            }
+            else {
+                throw new LogicException(
+                    'Algo or configuration error, failed to determine whether path[' . $path
+                    . '] is absolute or relative.'
+                );
+            }
+        }
+
+        if (!file_exists($path)) {
+            if (!mkdir($path, static::FILE_MODE_DIR, true)) {
+                throw new \RuntimeException('Failed to create path[' . $path . '].');
+            }
+            if (!is_writable($path)) {
+                throw new \RuntimeException('Not writable path[' . $path . '].');
+            }
+        }
+        // Ensure tmp dir.
+        $tmp_dir = $path . '/tmp';
+        if (!file_exists($tmp_dir)) {
+            if (!mkdir($tmp_dir, static::FILE_MODE_DIR)) {
+                throw new \RuntimeException('Failed to create tmp dir[' . $tmp_dir . '].');
+            }
+            if (!is_writable($tmp_dir)) {
+                throw new \RuntimeException('Not writable tmp dir[' . $tmp_dir . '].');
+            }
+        }
+        $stores_dir = $path . '/stores';
+        if (!file_exists($stores_dir)) {
+            if (!mkdir($stores_dir, static::FILE_MODE_DIR)) {
+                throw new \RuntimeException('Failed to create stores dir[' . $stores_dir . '].');
+            }
+            if (!is_writable($stores_dir)) {
+                throw new \RuntimeException('Not writable stores dir[' . $stores_dir . '].');
+            }
+        }
+
+        $this->path = $path;
+    }
+
+    const OPTIONS_DEFAULT = [
+        'ttl' => 0,
+    ];
+
+    /**
+     * Load previously created options of this store, if exists already.
+     *
+     * @return array
+     */
+    protected function load()
+    {
+        $file = $this->path . '/' . $this->name . '.json';
+        if (file_exists($file)) {
+            $json = file_get_contents($file);
+            $options = parse_ini_file($file, false, INI_SCANNER_RAW);
+            if (!$json) {
+                if ($json === false) {
+                    throw new \RuntimeException('Failed to read stores registry, file[' . $file . '].');
+                }
+            } else {
+                $options = json_decode($json, true);
+                if (!$options) {
+                    throw new \RuntimeException('Failed to JSON parse stores registry, file[' . $file . '].');
+                }
+                return $options;
+            }
+        }
+        return [];
+    }
+
+    /**
+     * @param array $options
+     */
+    protected function prepare(array $options)
+    {
+        $file = $this->path . '/stores.json';
+        if (file_exists($file)) {
+            $json = file_get_contents($file);
+            if (!$json) {
+                if ($json === false) {
+                    throw new \RuntimeException('Failed to read stores registry, file[' . $file . '].');
+                }
+                $stores = [];
+            } else {
+                $stores = json_decode($json, true);
+                if (!$stores) {
+                    throw new \RuntimeException('Failed to JSON parse stores registry, file[' . $file . '].');
+                }
+            }
+        }
+
+    }
+
+    /**
+     * @param string $name
+     * @param array $options
+     *
+     *
+     *
+     */
+    protected function setup(string $name, array $options = [])
+    {
+
     }
 
     /**
