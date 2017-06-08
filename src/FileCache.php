@@ -57,18 +57,28 @@ class FileCache extends Explorable implements CacheInterface
 
         // Unless time-to-live is to be ignored by all methods/procedures.
         if ($this->ttlDefault) {
-            $modified = filemtime($file);
-            if (!$modified) {
+            $end_of_life = filemtime($file);
+            if (!$end_of_life) {
                 throw new RuntimeException('Failed to get modified time of file[' . $file . '].');
             }
-            if ($modified < time()) {
+            if ($end_of_life < time()) {
+                // Old.
+                // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
+                @unlink($file);
+
                 return $default;
             }
         }
 
-        $serialized = file_get_contents($file);
+        // Suppress PHP notice/warning;
+        // file_exists()+file_get_contents() is not atomic.
+        $serialized = @file_get_contents($file);
+
         // Any serialized variable is truthy; like null: 'N;'.
         if (!$serialized) {
+            if (!file_exists($file)) {
+                return $default;
+            }
             throw new RuntimeException('Failed to read file[' . $file . '].');
         }
 
@@ -103,6 +113,8 @@ class FileCache extends Explorable implements CacheInterface
 
         $file = $this->file($key);
 
+        // @todo: use rename() because atomic on nix
+
         if (!file_put_contents(
             $file,
             $serialized
@@ -110,10 +122,12 @@ class FileCache extends Explorable implements CacheInterface
             throw new RuntimeException('Failed to write to file[' . $file . '].');
         }
 
-        // Unless time-to-live is to be ignored by all methods/procedures.
         if (
-            $ttl && $this->ttlDefault
+            $ttl
+            // Unless time-to-live is to be ignored by all methods/procedures.
+            && $this->ttlDefault
             && ($time_to_live = $this->timeToLive($ttl))
+            // Set the file's modified time to the (future) end-of-life time.
             && !touch($file, time() + $time_to_live)
         ) {
             throw new RuntimeException('Failed to set future modified time of[' . $file . '].');
@@ -126,6 +140,7 @@ class FileCache extends Explorable implements CacheInterface
      * @param string $key
      *
      * @return bool
+     *      Always true; no effective means of detecting error.
      *
      * @throws CacheInvalidArgumentException
      *      Arg key invalid.
@@ -135,7 +150,11 @@ class FileCache extends Explorable implements CacheInterface
         if (!$this->keyValidate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
-        return false;
+        // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
+        @unlink(
+            $this->file($key)
+        );
+        return true;
     }
 
     /**
@@ -258,6 +277,9 @@ class FileCache extends Explorable implements CacheInterface
      * @var string
      */
     const PATH_PARENT_DEFAULT = '../private/simplecomplex/file-cache';
+
+    // @todo: /stores
+    // @todo: /tmp  - for rename()ing
 
     /**
      * File mode used when creating directory.
@@ -408,7 +430,7 @@ class FileCache extends Explorable implements CacheInterface
                         if (DIRECTORY_SEPARATOR == '/') {
                             $doc_root_parent = str_replace('\\', '/', $doc_root_parent);
                         }
-                    } elseif (PHP_SAPI == 'cli') {
+                    } elseif (CliEnvironment::cli()) {
                         $doc_root_parent = (new CliEnvironment())->documentRoot;
                         if (!$doc_root_parent) {
                             throw new ConfigurationException(
@@ -452,6 +474,7 @@ class FileCache extends Explorable implements CacheInterface
 
     /**
      * @param int|\DateInterval|null $ttl
+     *      Non-empty must be non-negative.
      *
      * @return int
      *      Seconds.
