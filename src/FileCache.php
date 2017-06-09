@@ -14,6 +14,7 @@ use SimpleComplex\Cache\Exception\InvalidArgumentException;
 use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\CliEnvironment;
+use SimpleComplex\Utils\Utils;
 use SimpleComplex\Utils\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Utils\Exception\ConfigurationException;
 use SimpleComplex\Utils\Exception\OutOfBoundsException;
@@ -22,9 +23,10 @@ use SimpleComplex\Utils\Exception\RuntimeException;
 /**
  * PSR-16 Simple Cache file-based.
  *
- * @property-read $name
- * @property-read $type
- * @property-read $ttlDefault
+ * @property-read string $name
+ * @property-read string $type
+ * @property-read string $path
+ * @property-read int $ttlDefault
  *
  * @package SimpleComplex\Cache
  */
@@ -91,6 +93,7 @@ class FileCache extends Explorable implements CacheInterface
      * @param mixed $value
      *      \Serializable
      * @param int|\DateInterval|null $ttl
+     *      Null: uses the instance' default ttl.
      *
      * @return bool
      *
@@ -123,15 +126,23 @@ class FileCache extends Explorable implements CacheInterface
             throw new RuntimeException('Failed to write to file[' . $file . '].');
         }
 
-        if (
-            $ttl
-            // Unless time-to-live is to be ignored by all methods/procedures.
-            && $this->ttlDefault
-            && ($time_to_live = $this->timeToLive($ttl))
-            // Set the file's modified time to the (future) end-of-life time.
-            && !touch($file, time() + $time_to_live)
-        ) {
-            throw new RuntimeException('Failed to set future modified time of[' . $file . '].');
+        // Unless time-to-live is to be ignored by all methods/procedures.
+        if ($this->ttlDefault) {
+            if (!$ttl) {
+                if ($ttl === null) {
+                    $time_to_live = $this->ttlDefault;
+                } else {
+                    $time_to_live = 0;
+                }
+            } else {
+                $time_to_live = $this->timeToLive($ttl);
+            }
+            if (
+                $time_to_live
+                && !touch($file, time() + $time_to_live)
+            ) {
+                throw new RuntimeException('Failed to set future modified time of[' . $file . '].');
+            }
         }
 
         return true;
@@ -214,6 +225,7 @@ class FileCache extends Explorable implements CacheInterface
     protected $explorableIndex = [
         'name',
         'type',
+        'path',
         'ttlDefault',
     ];
 
@@ -230,6 +242,7 @@ class FileCache extends Explorable implements CacheInterface
         switch ($name) {
             case 'name':
             case 'type':
+            case 'path':
             case 'ttlDefault':
                 return $this->name;
         }
@@ -274,16 +287,39 @@ class FileCache extends Explorable implements CacheInterface
     // Custom.------------------------------------------------------------------
 
     /**
-     * Relative path is relative to document root.
+     * File mode used when creating directory.
      *
-     * Will contain:
-     * - /stores/[some store name]/[...caches]
+     * If not fitting, then extend this class.
+     */
+    const FILE_MODE_DIR = 2770;
+
+    /**
+     * File mode used when creating file.
+     *
+     * If not fitting, then extend this class.
+     */
+    const FILE_MODE_FILE = 2660;
+
+    /**
+     * Default time-to-live.
+     *
+     * @var int
+     */
+    const TTL_DEFAULT = 0;
+
+    /**
+     * File path where an instance' settings and cache files should be stored.
+     *
+     * Relative path is considered relative to document root.
+     *
+     * Will eventually contain:
+     * - /stores/[some store name]/[...cache files]
      * - /tmp
-     * - [some store name].json
+     * - [some store name].ini
      *
      * @var string
      */
-    const PATH = '../private/lib/simplecomplex/file-cache';
+    const PATH_DEFAULT = '../private/lib/simplecomplex/file-cache';
 
     /**
      * Relative path is relative to document root.
@@ -295,16 +331,6 @@ class FileCache extends Explorable implements CacheInterface
     // @todo: /stores
     // @todo: /tmp  - for rename()ing
     // @todo: /stores.json
-
-    /**
-     * File mode used when creating directory.
-     */
-    const FILE_MODE_DIR = 2770;
-
-    /**
-     * File mode used when creating file.
-     */
-    const FILE_MODE_FILE = 2660;
 
     /**
      * Cache store name.
@@ -321,19 +347,23 @@ class FileCache extends Explorable implements CacheInterface
     protected $type = 'file';
 
     /**
-     * @var integer
-     */
-    protected $ttlDefault = 0;
-
-    /**
-     * @var string
-     */
-    protected $parentPath = '';
-
-    /**
+     * Path given by argument or class default; absolute or relative.
+     *
      * @var string
      */
     protected $path = '';
+
+    /**
+     * Final absolute path.
+     *
+     * @var string
+     */
+    protected $pathReal = '';
+
+    /**
+     * @var integer
+     */
+    protected $ttlDefault = 0;
 
     /**
      * Parent paths ensured to exist and be writable.
@@ -347,30 +377,38 @@ class FileCache extends Explorable implements CacheInterface
 
     /**
      * @param string $name
-     * @param integer $ttlDefault
-     *   Zero: forever, and time-to-live will be ignored by all methods/operations.
-     * @param string $parentPath
-     *   Path above this store's dir; this store's own dir equals arg name.
-     *   Relative path will be considered relative to document root.
-     *   Default: empty; use default parent path.
-     *
+     * @param array $options {
+     *      @var int|null $ttlDefault = null
+     *          Null: class default (TTL_DEFAULT) rules.
+     *          Zero: forever, and ttl argument to methods will be ignored.
+     *          Positive int: used when a method receives null ttl argument.
+     *      @var string $path = ''
+     *          Empty: class default (PATH_DEFAULT) rules.
+     * }
      * @throws \InvalidArgumentException
      *      Invalid arg name.
      * @throws \SimpleComplex\Utils\Exception\ConfigurationException
      *      Cannot resolve document root.
-     * @throws \RuntimeException
+     * @throws RuntimeException
      *      Unable to create or write to store path.
      */
-    public function __construct(string $name, int $ttlDefault = 0, string $parentPath = '')
+    public function __construct(string $name, array $options = [])
     {
         if (!$this->nameValidate($name)) {
             throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), $name['
                 . $name . '].');
         }
 
-        $this->ttlDefault = $ttlDefault < 1 ? 0 : $ttlDefault;
+        $this->path = isset($options['path']) ? $options['path'] : static::PATH_DEFAULT;
+        // Resolve absolute path, and ensure that it exists.
+        $this->ensurePath();
 
-        $this->parentPath = $parentPath;
+        // Load settings, if pre-existing cache store.
+        $settings = $this->loadSettings();
+        // If options differ from preexisting settings, save settings.
+        if ($this->resolveSettings($settings, $options)) {
+            $this->saveSettings($settings);
+        }
     }
 
     /**
@@ -425,6 +463,8 @@ class FileCache extends Explorable implements CacheInterface
     /**
      * Ensures this class' (writable) path, tmp dir and stores dir.
      *
+     * @see FileCache::__construct()
+     *
      * @return void
      *
      * @throws ConfigurationException
@@ -433,9 +473,9 @@ class FileCache extends Explorable implements CacheInterface
      *      Algo or configuration error, can't determine whether path is
      *      absolute or relative.
      */
-    protected function path() /*: void*/
+    protected function ensurePath() /*: void*/
     {
-        $path = static::PATH;
+        $path = $this->path;
         // Absolute.
         if (
             strpos($path, '/') !== 0
@@ -475,99 +515,111 @@ class FileCache extends Explorable implements CacheInterface
 
         if (!file_exists($path)) {
             if (!mkdir($path, static::FILE_MODE_DIR, true)) {
-                throw new \RuntimeException('Failed to create path[' . $path . '].');
+                throw new RuntimeException('Failed to create path[' . $path . '].');
             }
             if (!is_writable($path)) {
-                throw new \RuntimeException('Not writable path[' . $path . '].');
+                throw new RuntimeException('Not writable path[' . $path . '].');
             }
         }
         // Ensure tmp dir.
         $tmp_dir = $path . '/tmp';
         if (!file_exists($tmp_dir)) {
             if (!mkdir($tmp_dir, static::FILE_MODE_DIR)) {
-                throw new \RuntimeException('Failed to create tmp dir[' . $tmp_dir . '].');
+                throw new RuntimeException('Failed to create tmp dir[' . $tmp_dir . '].');
             }
             if (!is_writable($tmp_dir)) {
-                throw new \RuntimeException('Not writable tmp dir[' . $tmp_dir . '].');
+                throw new RuntimeException('Not writable tmp dir[' . $tmp_dir . '].');
             }
         }
         $stores_dir = $path . '/stores';
         if (!file_exists($stores_dir)) {
             if (!mkdir($stores_dir, static::FILE_MODE_DIR)) {
-                throw new \RuntimeException('Failed to create stores dir[' . $stores_dir . '].');
+                throw new RuntimeException('Failed to create stores dir[' . $stores_dir . '].');
             }
             if (!is_writable($stores_dir)) {
-                throw new \RuntimeException('Not writable stores dir[' . $stores_dir . '].');
+                throw new RuntimeException('Not writable stores dir[' . $stores_dir . '].');
             }
         }
 
-        $this->path = $path;
+        $this->pathReal = $path;
     }
 
-    const OPTIONS_DEFAULT = [
-        'ttl' => 0,
-    ];
-
     /**
-     * Load previously created options of this store, if exists already.
+     * Load previously created settings of this store, if it already exists.
+     *
+     * @see FileCache::__construct()
      *
      * @return array
      */
-    protected function load()
+    protected function loadSettings()
     {
-        $file = $this->path . '/' . $this->name . '.json';
+        $file = $this->pathReal . '/' . $this->name . '.ini';
         if (file_exists($file)) {
-            $json = file_get_contents($file);
-            $options = parse_ini_file($file, false, INI_SCANNER_RAW);
-            if (!$json) {
-                if ($json === false) {
-                    throw new \RuntimeException('Failed to read stores registry, file[' . $file . '].');
-                }
-            } else {
-                $options = json_decode($json, true);
-                if (!$options) {
-                    throw new \RuntimeException('Failed to JSON parse stores registry, file[' . $file . '].');
-                }
-                return $options;
+            $settings = Utils::getInstance()->parseIniFile($file, false, true);
+            if (!$settings && $settings === false) {
+                throw new RuntimeException('Failed to read store settings, file[' . $file . '].');
             }
+            return $settings;
         }
         return [];
     }
 
+
     /**
+     * Compares preexiting settings with passed options, and set instance vars
+     * accordingly.
+     *
+     * @param array &$settings
+     *      By reference.
      * @param array $options
+     *
+     * @return int
+     *      Zero: Passed options equals existing settings.
+     *      One: Passed option differ from existing settings.
      */
-    protected function prepare(array $options)
+    protected function resolveSettings(array &$settings, array $options) /*: void*/
     {
-        $file = $this->path . '/stores.json';
-        if (file_exists($file)) {
-            $json = file_get_contents($file);
-            if (!$json) {
-                if ($json === false) {
-                    throw new \RuntimeException('Failed to read stores registry, file[' . $file . '].');
-                }
-                $stores = [];
+        $diff = 0;
+
+        // ttlDefault.
+        if (isset($options['ttlDefault'])) {
+            if (!$options['ttlDefault']) {
+                $this->ttlDefault = 0;
+            } elseif (!is_int($options['ttlDefault']) || $options['ttlDefault'] < 0) {
+                throw new InvalidArgumentException('Option ttlDefault is not non-negative integer or null.');
             } else {
-                $stores = json_decode($json, true);
-                if (!$stores) {
-                    throw new \RuntimeException('Failed to JSON parse stores registry, file[' . $file . '].');
-                }
+                $this->ttlDefault = $options['ttlDefault'];
             }
+            if (!isset($settings['ttlDefault']) || $this->ttlDefault != $settings['ttlDefault']) {
+                $diff = 1;
+                $settings['ttlDefault'] = $this->ttlDefault;
+            }
+        } elseif (isset($settings['ttlDefault'])) {
+            $this->ttlDefault = $settings['ttlDefault'];
+        } else {
+            $this->ttlDefault = static::TTL_DEFAULT;
         }
 
+        return $diff;
     }
 
     /**
-     * @param string $name
-     * @param array $options
+     * @param array $settings
      *
+     * @return void
      *
-     *
+     * @throws RuntimeException
+     *      Failing to write settings to file.
      */
-    protected function setup(string $name, array $options = [])
+    protected function saveSettings(array $settings) /*:void*/
     {
-
+        $file = $this->pathReal . '/' . $this->name . '.ini';
+        $content = Utils::getInstance()->iterableToIniString($settings);
+        if (!file_put_contents($file, $content)) {
+            throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
+        }
     }
+
 
     /**
      * Resolve path and file name.
@@ -610,7 +662,7 @@ class FileCache extends Explorable implements CacheInterface
                 }
                 // Relative to current dir is illegal.
                 elseif ($parent_path{0} === '.') {
-                    throw new \RuntimeException('Invalid parent path[' . $parent_path . '].');
+                    throw new RuntimeException('Invalid parent path[' . $parent_path . '].');
                 }
             }
             // We don't wanna check parent path and (full) store path separately;
@@ -618,11 +670,11 @@ class FileCache extends Explorable implements CacheInterface
             $store_path = $parent_path . '/' . $this->name;
             if (!file_exists($store_path)) {
                 if (!mkdir($store_path, static::FILE_MODE_DIR, true)) {
-                    throw new \RuntimeException('Failed to create store path[' . $store_path . '].');
+                    throw new RuntimeException('Failed to create store path[' . $store_path . '].');
                 }
             }
             if (!is_writable($store_path)) {
-                throw new \RuntimeException('Not writable store path[' . $store_path . '].');
+                throw new RuntimeException('Not writable store path[' . $store_path . '].');
             }
             static::$parentPathsEnsured[$parent_path] = true;
 
