@@ -398,10 +398,11 @@ class FileCache extends Explorable implements CacheInterface
             throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), $name['
                 . $name . '].');
         }
+        $this->name = $name;
 
         $this->path = isset($options['path']) ? $options['path'] : static::PATH_DEFAULT;
         // Resolve absolute path, and ensure that it exists.
-        $this->ensurePath();
+        $this->ensureDirectories();
 
         // Load settings, if pre-existing cache store.
         $settings = $this->loadSettings();
@@ -473,7 +474,7 @@ class FileCache extends Explorable implements CacheInterface
      *      Algo or configuration error, can't determine whether path is
      *      absolute or relative.
      */
-    protected function ensurePath() /*: void*/
+    protected function ensureDirectories() /*: void*/
     {
         $path = $this->path;
         // Absolute.
@@ -512,13 +513,14 @@ class FileCache extends Explorable implements CacheInterface
                 );
             }
         }
-
-        if (!file_exists($path)) {
-            if (!mkdir($path, static::FILE_MODE_DIR, true)) {
-                throw new RuntimeException('Failed to create path[' . $path . '].');
+        // Ensure cache dir.
+        $cache_dir = $path . '/stores/' . $this->name;
+        if (!file_exists($cache_dir)) {
+            if (!mkdir($cache_dir, static::FILE_MODE_DIR, true)) {
+                throw new RuntimeException('Failed to create cache dir[' . $cache_dir . '].');
             }
             if (!is_writable($path)) {
-                throw new RuntimeException('Not writable path[' . $path . '].');
+                throw new RuntimeException('Not writable cache dir[' . $cache_dir . '].');
             }
         }
         // Ensure tmp dir.
@@ -529,15 +531,6 @@ class FileCache extends Explorable implements CacheInterface
             }
             if (!is_writable($tmp_dir)) {
                 throw new RuntimeException('Not writable tmp dir[' . $tmp_dir . '].');
-            }
-        }
-        $stores_dir = $path . '/stores';
-        if (!file_exists($stores_dir)) {
-            if (!mkdir($stores_dir, static::FILE_MODE_DIR)) {
-                throw new RuntimeException('Failed to create stores dir[' . $stores_dir . '].');
-            }
-            if (!is_writable($stores_dir)) {
-                throw new RuntimeException('Not writable stores dir[' . $stores_dir . '].');
             }
         }
 
