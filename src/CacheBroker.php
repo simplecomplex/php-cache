@@ -130,13 +130,13 @@ class CacheBroker extends Explorable
      *
      * @param string $name
      *      Allows alpha
-     * @param array $storeConstructorArgs
+     * @param mixed ...$storeConstructorArgs
      *      Arguments to the store type class' constructor or make().
      *      If empty, this method will provide fitting arguments.
      *
      * @return \Psr\SimpleCache\CacheInterface
      */
-    public function getStore(string $name, array $storeConstructorArgs = []) : CacheInterface
+    public function getStore(string $name, ...$storeConstructorArgs) : CacheInterface
     {
         if (!$this->nameValidate($name)) {
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
@@ -144,11 +144,12 @@ class CacheBroker extends Explorable
         if (isset($this->stores[$name])) {
             return $this->stores[$name];
         }
-        $args = $storeConstructorArgs ? $storeConstructorArgs : [
-            $name,
-        ];
+
+        // @todo: problem - first cache implementation's constructor param must be $name, and this $storeConstructorArgs must not contain that argument.
+        array_unshift($storeConstructorArgs, $name);
+
         $class = static::CLASS_BY_TYPE['file'];
-        $this->stores[$name] = $store = new $class(...$args);
+        $this->stores[$name] = $store = new $class(...$storeConstructorArgs);
         return $store;
     }
 

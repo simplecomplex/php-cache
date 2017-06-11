@@ -311,7 +311,7 @@ class FileCache extends Explorable implements CacheInterface
             case 'type':
             case 'path':
             case 'ttlDefault':
-                return $this->name;
+                return $this->{$name};
         }
         throw new OutOfBoundsException(get_class($this) . ' instance has no property[' . $name . '].');
     }
@@ -358,14 +358,14 @@ class FileCache extends Explorable implements CacheInterface
      *
      * If not fitting, then extend this class.
      */
-    const FILE_MODE_DIR = 2770;
+    const FILE_MODE_DIR = 02770;
 
     /**
      * File mode used when creating file.
      *
      * If not fitting, then extend this class.
      */
-    const FILE_MODE_FILE = 2660;
+    const FILE_MODE_FILE = 02660;
 
     /**
      * Default time-to-live.
@@ -532,6 +532,7 @@ class FileCache extends Explorable implements CacheInterface
      * Ensures this class' (writable) path, tmp dir and stores dir.
      *
      * @see FileCache::__construct()
+     * @see Utils::ensurePath()
      *
      * @return void
      *
@@ -540,6 +541,8 @@ class FileCache extends Explorable implements CacheInterface
      * @throws LogicException
      *      Algo or configuration error, can't determine whether path is
      *      absolute or relative.
+     * @throws \Exception
+     *      Propagated, various types from Utils::ensurePath().
      */
     protected function ensureDirectories() /*: void*/
     {
@@ -580,25 +583,17 @@ class FileCache extends Explorable implements CacheInterface
                 );
             }
         }
+
+        $utils = Utils::getInstance();
         // Ensure cache dir.
         $cache_dir = $path . '/stores/' . $this->name;
         if (!file_exists($cache_dir)) {
-            if (!mkdir($cache_dir, static::FILE_MODE_DIR, true)) {
-                throw new RuntimeException('Failed to create cache dir[' . $cache_dir . '].');
-            }
-            if (!is_writable($cache_dir)) {
-                throw new RuntimeException('Not writable cache dir[' . $cache_dir . '].');
-            }
+            $utils->ensurePath($cache_dir, static::FILE_MODE_DIR);
         }
         // Ensure tmp dir.
         $tmp_dir = $path . '/tmp';
         if (!file_exists($tmp_dir)) {
-            if (!mkdir($tmp_dir, static::FILE_MODE_DIR)) {
-                throw new RuntimeException('Failed to create tmp dir[' . $tmp_dir . '].');
-            }
-            if (!is_writable($tmp_dir)) {
-                throw new RuntimeException('Not writable tmp dir[' . $tmp_dir . '].');
-            }
+            $utils->ensurePath($tmp_dir, static::FILE_MODE_DIR);
         }
 
         $this->pathReal = $path;
@@ -654,7 +649,8 @@ class FileCache extends Explorable implements CacheInterface
         } elseif (isset($settings['ttlDefault'])) {
             $this->ttlDefault = $settings['ttlDefault'];
         } else {
-            $this->ttlDefault = static::TTL_DEFAULT;
+            $diff = 1;
+            $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
         }
 
         return $diff;
@@ -672,8 +668,14 @@ class FileCache extends Explorable implements CacheInterface
     {
         $file = $this->pathReal . '/' . $this->name . '.ini';
         $content = Utils::getInstance()->iterableToIniString($settings);
+        $set_mode = !file_exists($file);
         if (!file_put_contents($file, $content)) {
             throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
+        }
+        if ($set_mode) {
+            if (!chmod($file, static::FILE_MODE_FILE)) {
+                throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
+            }
         }
     }
 
