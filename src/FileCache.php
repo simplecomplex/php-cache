@@ -136,6 +136,12 @@ class FileCache extends Explorable implements CacheInterface
         if (!rename($tmp_file, $file)) {
             throw new RuntimeException('Failed to rename temp to final cache file.');
         }
+        // tempnam() writes using file mode 0600, and rename doesn't alter mode.
+        if (($this->fileMode != 'user' || static::FILE_MODE['file_user'] != 0600)
+            && !chmod($file, static::FILE_MODE['file_' . $this->fileMode])
+        ) {
+            throw new RuntimeException('Failed to chmod cache file[' . $file . '].');
+        }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
         if ($this->ttlDefault) {
@@ -354,27 +360,6 @@ class FileCache extends Explorable implements CacheInterface
     // Custom.------------------------------------------------------------------
 
     /**
-     * File mode used when creating directory.
-     *
-     * If not fitting, then extend this class.
-     */
-    const FILE_MODE_DIR = 02770;
-
-    /**
-     * File mode used when creating file.
-     *
-     * If not fitting, then extend this class.
-     */
-    const FILE_MODE_FILE = 02660;
-
-    /**
-     * Default time-to-live.
-     *
-     * @var int
-     */
-    const TTL_DEFAULT = 0;
-
-    /**
      * File path where an instance' settings and cache files should be stored.
      *
      * Relative path is considered relative to document root.
@@ -389,15 +374,36 @@ class FileCache extends Explorable implements CacheInterface
     const PATH_DEFAULT = '../private/lib/simplecomplex/file-cache';
 
     /**
-     * Relative path is relative to document root.
+     * File modes for directory/file writing, using respectively user-only,
+     * group read/write/execute and group plus set group id.
+     *
+     * Must be octals integers, with leading zero, nothing else seem to work;
+     * even if decoct/octdec() juggling.
+     *
+     * @var int[]
+     */
+    const FILE_MODE = [
+        'dir_user' => 0700,
+        'file_user' => 0600,
+        'dir_group' => 0770,
+        'file_group' => 0660,
+        'dir_group_setgid' => 02770,
+        'file_group_setgid' => 02660,
+    ];
+
+    /**
+     * Values: user|group|group_setgid.
      *
      * @var string
      */
-    const PATH_PARENT_DEFAULT = '../private/lib/simplecomplex/file-cache';
+    const FILE_MODE_DEFAULT = 'user';
 
-    // @todo: /stores
-    // @todo: /tmp  - for rename()ing
-    // @todo: /stores.json
+    /**
+     * Default time-to-live.
+     *
+     * @var int
+     */
+    const TTL_DEFAULT = 0;
 
     /**
      * Cache store name.
@@ -428,6 +434,13 @@ class FileCache extends Explorable implements CacheInterface
     protected $pathReal = '';
 
     /**
+     * Values: user|group|group_setgid.
+     *
+     * @var string
+     */
+    protected $fileMode = '';
+
+    /**
      * @var integer
      */
     protected $ttlDefault = 0;
@@ -443,17 +456,27 @@ class FileCache extends Explorable implements CacheInterface
     protected static $parentPathsEnsured = array();
 
     /**
+     * Create or load cache store.
+     *
      * @param string $name
      * @param array $options {
-     *      @var int|\DateInterval|null $ttlDefault = null
-     *          Null: class default (TTL_DEFAULT) rules.
-     *          Zero: forever, and ttl argument to set method will be ignored.
-     *          Positive int: used when set method receives null ttl argument.
      *      @var string $path = ''
      *          Empty: class default (PATH_DEFAULT) rules.
+     *      @var string $fileMode = ''
+     *          Empty: preexisting setting or class default (FILE_MODE_DEFAULT)
+     *          rules.
+     *          File mode will only apply fully to all aspects of dir/file
+     *          writing the first time this cache store gets created. Later it
+     *          will only apply to new cache files.
+     *      @var int|\DateInterval|null $ttlDefault = null
+     *          Null: preexisting setting or class default (TTL_DEFAULT) rules.
+     *          Zero: forever, and ttl argument to set method will be ignored.
+     *          Positive int: used when set method receives null ttl argument.
      * }
-     * @throws \InvalidArgumentException
+     * @throws InvalidArgumentException
      *      Invalid arg name.
+     * @throws \TypeError
+     *      Wrong type of arg options bucket.
      * @throws \SimpleComplex\Utils\Exception\ConfigurationException
      *      Cannot resolve document root.
      * @throws RuntimeException
@@ -462,21 +485,102 @@ class FileCache extends Explorable implements CacheInterface
     public function __construct(string $name, array $options = [])
     {
         if (!$this->nameValidate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), $name['
+            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name['
                 . $name . '].');
         }
         $this->name = $name;
 
-        $this->path = isset($options['path']) ? $options['path'] : static::PATH_DEFAULT;
-        // Resolve absolute path, and ensure that it exists.
-        $this->ensureDirectories();
+        if (!empty($options['path'])) {
+            if (!is_string($options['path'])) {
+                throw new \TypeError('Arg options[path] type['
+                    . (!is_object($options['path']) ? gettype($options['path']) :
+                        get_class($options['path'])) . '] is not string.');
+            }
+            $this->path = $options['path'];
+        } else {
+            $this->path = static::PATH_DEFAULT;
+        }
 
-        // Load settings, if pre-existing cache store.
-        $settings = $this->loadSettings();
-        // If options differ from preexisting settings, save settings.
-        if ($this->resolveSettings($settings, $options)) {
+        // Resolve path, and load preexisting settings if they exist.
+        $settings = $this->resolvePath() ? $this->loadSettings() : [];
+        // Resolve options and final instance var values, and figure out if we
+        // need to update filed settings.
+        $save_settings = $this->resolveSettings($settings, $options);
+        // Create path, cache dir and tmp dir, if they don't exist.
+        $this->ensureDirectories();
+        // Save/update settings.
+        if ($save_settings) {
             $this->saveSettings($settings);
         }
+    }
+
+    /**
+     * Compares preexiting settings with passed options, and set instance vars
+     * accordingly.
+     *
+     * Separated from from constructor to accommodate class extension.
+     *
+     * @param array &$settings
+     *      By reference.
+     * @param array $options
+     *
+     * @return bool
+     *      True: preexisting setting don't exist or differ from options passed.
+     *
+     * @throws \TypeError
+     */
+    protected function resolveSettings(array &$settings, array $options) /*: void*/
+    {
+        $diff = !$settings;
+        $settings_exist = !$diff;
+
+        // fileMode.
+        if (!empty($options['fileMode'])) {
+            if (!is_string($options['fileMode'])) {
+                throw new \TypeError('Arg options[fileMode] type['
+                    . (!is_object($options['fileMode']) ? gettype($options['fileMode']) :
+                        get_class($options['fileMode'])) . '] is not string.');
+            }
+            switch ($options['fileMode']) {
+                case 'user':
+                case 'group':
+                case 'group_setgid':
+                    $this->fileMode = $options['fileMode'];
+                    break;
+                default:
+                    throw new InvalidArgumentException('Arg name must be user|group|group_setgid or empty, fileMode['
+                        . $options['fileMode'] . '].');
+            }
+            if (!$settings_exist || $options['fileMode'] != $settings['fileMode']) {
+                $diff = true;
+                $settings['fileMode'] = $options['fileMode'];
+            }
+        } elseif ($settings_exist) {
+            $this->fileMode = $settings['fileMode'];
+        } else {
+            $settings['fileMode'] = $this->fileMode = static::FILE_MODE_DEFAULT;
+            // And no settings means diff is already true.
+        }
+
+        // ttlDefault.
+        if (isset($options['ttlDefault'])) {
+            if (!$options['ttlDefault']) {
+                $this->ttlDefault = 0;
+            } else {
+                $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
+            }
+            if (!$settings_exist || $options['ttlDefault'] != $settings['ttlDefault']) {
+                $diff = 1;
+                $settings['ttlDefault'] = $options['ttlDefault'];
+            }
+        } elseif ($settings_exist) {
+            $this->ttlDefault = $settings['ttlDefault'];
+        } else {
+            $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
+            // And no settings means diff is already true.
+        }
+
+        return $diff;
     }
 
     /**
@@ -529,22 +633,18 @@ class FileCache extends Explorable implements CacheInterface
     }
 
     /**
-     * Ensures this class' (writable) path, tmp dir and stores dir.
+     * Resolve path and check if exists.
      *
-     * @see FileCache::__construct()
-     * @see Utils::ensurePath()
-     *
-     * @return void
+     * @return bool
+     *      Whether the path exists already.
      *
      * @throws ConfigurationException
      *      If document root cannot be determined.
      * @throws LogicException
      *      Algo or configuration error, can't determine whether path is
      *      absolute or relative.
-     * @throws \Exception
-     *      Propagated, various types from Utils::ensurePath().
      */
-    protected function ensureDirectories() /*: void*/
+    protected function resolvePath() : bool
     {
         $path = $this->path;
         // Absolute.
@@ -583,20 +683,45 @@ class FileCache extends Explorable implements CacheInterface
                 );
             }
         }
+        if (strpos($path, '/./') || strpos($path, '/../')) {
+            throw new RuntimeException('Path doesn\'t resolve to an absolute path[' . $path . ']');
+        }
+        $this->pathReal = $path;
 
+        if (file_exists($path)) {
+            if (!is_dir($path)) {
+                throw new RuntimeException('Path exists but is not directory, path[' . $path . ']');
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Ensures this class' (writable) path, tmp dir and stores dir.
+     *
+     * @see FileCache::__construct()
+     * @see FileCache::resolvePath()
+     * @see Utils::ensurePath()
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     *      Propagated, various types from Utils::ensurePath().
+     */
+    protected function ensureDirectories() /*: void*/
+    {
         $utils = Utils::getInstance();
         // Ensure cache dir.
-        $cache_dir = $path . '/stores/' . $this->name;
+        $cache_dir = $this->pathReal . '/stores/' . $this->name;
         if (!file_exists($cache_dir)) {
-            $utils->ensurePath($cache_dir, static::FILE_MODE_DIR);
+            $utils->ensurePath($cache_dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
         // Ensure tmp dir.
-        $tmp_dir = $path . '/tmp';
+        $tmp_dir = $this->pathReal . '/tmp';
         if (!file_exists($tmp_dir)) {
-            $utils->ensurePath($tmp_dir, static::FILE_MODE_DIR);
+            $utils->ensurePath($tmp_dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
-
-        $this->pathReal = $path;
     }
 
     /**
@@ -620,43 +745,6 @@ class FileCache extends Explorable implements CacheInterface
     }
 
     /**
-     * Compares preexiting settings with passed options, and set instance vars
-     * accordingly.
-     *
-     * @param array &$settings
-     *      By reference.
-     * @param array $options
-     *
-     * @return int
-     *      Zero: Passed options equals existing settings.
-     *      One: Passed option differ from existing settings.
-     */
-    protected function resolveSettings(array &$settings, array $options) /*: void*/
-    {
-        $diff = 0;
-
-        // ttlDefault.
-        if (isset($options['ttlDefault'])) {
-            if (!$options['ttlDefault']) {
-                $this->ttlDefault = 0;
-            } else {
-                $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
-            }
-            if (!isset($settings['ttlDefault']) || $this->ttlDefault != $settings['ttlDefault']) {
-                $diff = 1;
-                $settings['ttlDefault'] = $this->ttlDefault;
-            }
-        } elseif (isset($settings['ttlDefault'])) {
-            $this->ttlDefault = $settings['ttlDefault'];
-        } else {
-            $diff = 1;
-            $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
-        }
-
-        return $diff;
-    }
-
-    /**
      * @param array $settings
      *
      * @return void
@@ -668,12 +756,12 @@ class FileCache extends Explorable implements CacheInterface
     {
         $file = $this->pathReal . '/' . $this->name . '.ini';
         $content = Utils::getInstance()->iterableToIniString($settings);
-        $set_mode = !file_exists($file);
+        $set_mode = $this->fileMode != 'user' && !file_exists($file);
         if (!file_put_contents($file, $content)) {
             throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
         }
         if ($set_mode) {
-            if (!chmod($file, static::FILE_MODE_FILE)) {
+            if (!chmod($file, static::FILE_MODE['file_' . $this->fileMode])) {
                 throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
             }
         }

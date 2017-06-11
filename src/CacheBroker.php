@@ -150,6 +150,7 @@ class CacheBroker extends Explorable
 
         $class = static::CLASS_BY_TYPE['file'];
         $this->stores[$name] = $store = new $class(...$storeConstructorArgs);
+        $this->explorableIndex[] = $name;
         return $store;
     }
 
