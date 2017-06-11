@@ -13,7 +13,7 @@ use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\Utils;
-use SimpleComplex\Utils\Exception\CacheInvalidArgumentException;
+use SimpleComplex\Cache\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Utils\Exception\ConfigurationException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
 use SimpleComplex\Cache\Exception\LogicException;
@@ -551,8 +551,9 @@ class FileCache extends Explorable implements CacheInterface
                     $this->fileMode = $options['fileMode'];
                     break;
                 default:
-                    throw new InvalidArgumentException('Arg name must be user|group|group_setgid or empty, fileMode['
-                        . $options['fileMode'] . '].');
+                    throw new InvalidArgumentException(
+                        'Arg fileMode must be user|group|group_setgid or empty, fileMode[' . $options['fileMode'] . '].'
+                    );
             }
             if (!$settings_exist || $options['fileMode'] != $settings['fileMode']) {
                 $diff = true;
