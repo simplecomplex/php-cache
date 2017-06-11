@@ -11,9 +11,9 @@ namespace SimpleComplex\Cache;
 
 use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Utils\Explorable;
-use SimpleComplex\Utils\Exception\RuntimeException;
-use SimpleComplex\Utils\Exception\OutOfBoundsException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
+use SimpleComplex\Cache\Exception\OutOfBoundsException;
+use SimpleComplex\Cache\Exception\RuntimeException;
 
 /**
  * Cache broker is an abstraction of actual CacheInterface classes/instances,

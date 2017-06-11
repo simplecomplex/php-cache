@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-06-11
+-----------------------------------
+- FileCache fileMode option. And the class seem to work.
+- Use own exception types, not types declared in Utils.
+
 SimpleComplex/Cache 1.x, 2017-06-06
 -----------------------------------
 - CacheBroker is now Utils\Explorable, listing registered cache stores.

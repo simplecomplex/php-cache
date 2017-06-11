@@ -12,13 +12,13 @@ namespace SimpleComplex\Cache;
 use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
 use SimpleComplex\Cache\Exception\LogicException;
+use SimpleComplex\Cache\Exception\OutOfBoundsException;
+use SimpleComplex\Cache\Exception\RuntimeException;
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\Utils;
 use SimpleComplex\Utils\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Utils\Exception\ConfigurationException;
-use SimpleComplex\Utils\Exception\OutOfBoundsException;
-use SimpleComplex\Utils\Exception\RuntimeException;
 
 /**
  * PSR-16 Simple Cache file-based.
@@ -26,6 +26,7 @@ use SimpleComplex\Utils\Exception\RuntimeException;
  * @property-read string $name
  * @property-read string $type
  * @property-read string $path
+ * @property-read string $fileMode
  * @property-read int $ttlDefault
  *
  * @package SimpleComplex\Cache
@@ -299,6 +300,7 @@ class FileCache extends Explorable implements CacheInterface
         'name',
         'type',
         'path',
+        'fileMode',
         'ttlDefault',
     ];
 
@@ -316,6 +318,7 @@ class FileCache extends Explorable implements CacheInterface
             case 'name':
             case 'type':
             case 'path':
+            case 'fileMode':
             case 'ttlDefault':
                 return $this->{$name};
         }
