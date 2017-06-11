@@ -1,7 +1,7 @@
 <?php
 /**
- * SimpleComplex PHP Utils
- * @link      https://github.com/simplecomplex/php-utils
+ * SimpleComplex PHP Cache
+ * @link      https://github.com/simplecomplex/php-cache
  * @copyright Copyright (c) 2017 Jacob Friis Mathiasen
  * @license   https://github.com/simplecomplex/php-utils/blob/master/LICENSE (MIT License)
  */
@@ -10,15 +10,15 @@ declare(strict_types=1);
 namespace SimpleComplex\Cache;
 
 use Psr\SimpleCache\CacheInterface;
-use SimpleComplex\Cache\Exception\InvalidArgumentException;
-use SimpleComplex\Cache\Exception\LogicException;
-use SimpleComplex\Cache\Exception\OutOfBoundsException;
-use SimpleComplex\Cache\Exception\RuntimeException;
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\Utils;
 use SimpleComplex\Utils\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Utils\Exception\ConfigurationException;
+use SimpleComplex\Cache\Exception\InvalidArgumentException;
+use SimpleComplex\Cache\Exception\LogicException;
+use SimpleComplex\Cache\Exception\OutOfBoundsException;
+use SimpleComplex\Cache\Exception\RuntimeException;
 
 /**
  * PSR-16 Simple Cache file-based.

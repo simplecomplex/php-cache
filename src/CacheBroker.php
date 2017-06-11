@@ -1,7 +1,7 @@
 <?php
 /**
- * SimpleComplex PHP Utils
- * @link      https://github.com/simplecomplex/php-utils
+ * SimpleComplex PHP Cache
+ * @link      https://github.com/simplecomplex/php-cache
  * @copyright Copyright (c) 2017 Jacob Friis Mathiasen
  * @license   https://github.com/simplecomplex/php-utils/blob/master/LICENSE (MIT License)
  */
@@ -145,7 +145,9 @@ class CacheBroker extends Explorable
             return $this->stores[$name];
         }
 
-        // @todo: problem - first cache implementation's constructor param must be $name, and this $storeConstructorArgs must not contain that argument.
+        // NB: First cache implementation's constructor param must be $name,
+        // and this $storeConstructorArgs must not contain that argument.
+        // Not sure this is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
         $class = static::CLASS_BY_TYPE['file'];
