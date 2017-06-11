@@ -53,7 +53,7 @@ class FileCache extends Explorable implements CacheInterface
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
 
-        $file = $this->file($key);
+        $file = $this->pathReal . '/stores/' . $this->name . '/' . $key;
         if (!file_exists($file)) {
             return $default;
         }
@@ -80,6 +80,8 @@ class FileCache extends Explorable implements CacheInterface
         // Any serialized variable is truthy; like null: 'N;'.
         if (!$serialized) {
             if (!file_exists($file)) {
+                // Apparantly the file was deleted between first call to
+                // file_exists() and the call to file_get_contents().
                 return $default;
             }
             throw new RuntimeException('Failed to read file[' . $file . '].');
@@ -94,6 +96,7 @@ class FileCache extends Explorable implements CacheInterface
      *      \Serializable
      * @param int|\DateInterval|null $ttl
      *      Null: uses the instance' default ttl.
+     *      Zero: forever, no end of life.
      *
      * @return bool
      *
@@ -115,15 +118,23 @@ class FileCache extends Explorable implements CacheInterface
             throw new RuntimeException('Failed to serialize value.');
         }
 
-        $file = $this->file($key);
-
-        // @todo: use rename() because atomic on nix
-
-        if (!file_put_contents(
-            $file,
-            $serialized
-        )) {
-            throw new RuntimeException('Failed to write to file[' . $file . '].');
+        $file = $this->pathReal . '/stores/' . $this->name . '/' . $key;
+        // Uses rename() because that's atomic in *nix systems.
+        // @ is PSR-16 illegal in key, so usable as mock directory separator.
+        if (!($tmp_file = tempnam($this->pathReal . '/tmp', $this->name . '@' . $key))) {
+            throw new RuntimeException('Failed to reserve temp file.');
+        }
+        if (!($handle = fopen($tmp_file, 'w'))) {
+            throw new RuntimeException('Failed to open temp file.');
+        }
+        if (!($write = fwrite($handle, $serialized))) {
+            throw new RuntimeException('Failed to write to temp file.');
+        }
+        if (!($close = fclose($handle))) {
+            throw new RuntimeException('Failed to close temp file.');
+        }
+        if (!rename($tmp_file, $file)) {
+            throw new RuntimeException('Failed to rename temp to final cache file.');
         }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
@@ -163,60 +174,116 @@ class FileCache extends Explorable implements CacheInterface
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
-        @unlink(
-            $this->file($key)
-        );
+        @unlink($this->pathReal . '/stores/' . $this->name . '/' . $key);
         return true;
     }
 
     /**
-     * @throws \LogicException
+     * Clear all caches of this store.
      *
-     * @inheritdoc
+     * @return true
+     *
+     * @throws \UnexpectedValueException
+     *      If this store's cache dir cannot be opened.
+     * @throws \RuntimeException
+     *      On other failures.
      */
     public function clear()
     {
-        throw new \LogicException('Method not implemented.');
+        $cache_dir = $this->pathReal . '/stores/' . $this->name;
+        $dir_iterator = new \DirectoryIterator($cache_dir);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                unlink($cache_dir . '/' . $item->getFilename());
+            }
+        }
+        return true;
     }
 
     /**
-     * @throws \LogicException
+     * @param iterable $keys
+     * @param mixed|null $default
      *
-     * @inheritdoc
+     * @return array
+     *
+     * @throws \TypeError
      */
     public function getMultiple($keys, $default = null)
     {
-        throw new \LogicException('Method not implemented.');
+        if (!Utils::getInstance()->isIterable($keys)) {
+            throw new \TypeError(
+                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not iterable.'
+            );
+        }
+        $list = [];
+        foreach ($keys as $key) {
+            $list[$key] = $this->get($key, $default);
+        }
+        return $list;
     }
 
     /**
-     * @throws \LogicException
+     * @param iterable $values
+     * @param int|\DateInterval|null $ttl
+     *      Null: uses the instance' default ttl.
+     *      Zero: forever, no end of life.
      *
-     * @inheritdoc
+     * @return bool
+     *
+     * @throws \TypeError
      */
     public function setMultiple($values, $ttl = null)
     {
-        throw new \LogicException('Method not implemented.');
+        if (!Utils::getInstance()->isIterable($values)) {
+            throw new \TypeError(
+                'Arg values type[' . (!is_object($values) ? gettype($values) : get_class($values))
+                . '] is not iterable.'
+            );
+        }
+        foreach ($values as $key => $value) {
+            if (!$this->set($key, $value, $ttl)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
-     * @throws \LogicException
+     * @param iterable $keys
      *
-     * @inheritdoc
+     * @return bool
+     *
+     * @throws \TypeError
      */
     public function deleteMultiple($keys)
     {
-        throw new \LogicException('Method not implemented.');
+        if (!Utils::getInstance()->isIterable($keys)) {
+            throw new \TypeError(
+                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not iterable.'
+            );
+        }
+        foreach ($keys as $key) {
+            // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
+            @unlink($this->pathReal . '/stores/' . $this->name . '/' . $key);
+        }
+        return true;
     }
 
     /**
-     * @throws \LogicException
+     * Does not consider time-to-live, even if this instance has a default ttl.
      *
-     * @inheritdoc
+     * @param string $key
+     *
+     * @return bool
+     *
+     * @throws CacheInvalidArgumentException
      */
     public function has($key)
     {
-        throw new \LogicException('Method not implemented.');
+        if (!$this->keyValidate($key)) {
+            throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
+        }
+        return file_exists($this->pathReal . '/stores/' . $this->name . '/' . $key);
     }
 
 
@@ -378,10 +445,10 @@ class FileCache extends Explorable implements CacheInterface
     /**
      * @param string $name
      * @param array $options {
-     *      @var int|null $ttlDefault = null
+     *      @var int|\DateInterval|null $ttlDefault = null
      *          Null: class default (TTL_DEFAULT) rules.
-     *          Zero: forever, and ttl argument to methods will be ignored.
-     *          Positive int: used when a method receives null ttl argument.
+     *          Zero: forever, and ttl argument to set method will be ignored.
+     *          Positive int: used when set method receives null ttl argument.
      *      @var string $path = ''
      *          Empty: class default (PATH_DEFAULT) rules.
      * }
@@ -519,7 +586,7 @@ class FileCache extends Explorable implements CacheInterface
             if (!mkdir($cache_dir, static::FILE_MODE_DIR, true)) {
                 throw new RuntimeException('Failed to create cache dir[' . $cache_dir . '].');
             }
-            if (!is_writable($path)) {
+            if (!is_writable($cache_dir)) {
                 throw new RuntimeException('Not writable cache dir[' . $cache_dir . '].');
             }
         }
@@ -557,7 +624,6 @@ class FileCache extends Explorable implements CacheInterface
         return [];
     }
 
-
     /**
      * Compares preexiting settings with passed options, and set instance vars
      * accordingly.
@@ -578,10 +644,8 @@ class FileCache extends Explorable implements CacheInterface
         if (isset($options['ttlDefault'])) {
             if (!$options['ttlDefault']) {
                 $this->ttlDefault = 0;
-            } elseif (!is_int($options['ttlDefault']) || $options['ttlDefault'] < 0) {
-                throw new InvalidArgumentException('Option ttlDefault is not non-negative integer or null.');
             } else {
-                $this->ttlDefault = $options['ttlDefault'];
+                $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
             }
             if (!isset($settings['ttlDefault']) || $this->ttlDefault != $settings['ttlDefault']) {
                 $diff = 1;
@@ -613,81 +677,24 @@ class FileCache extends Explorable implements CacheInterface
         }
     }
 
-
     /**
-     * Resolve path and file name.
+     * Average, and not exact; doesn't consider the year-divisible-by-400 rule.
      *
-     * @param string $key
-     *
-     * @return string
+     * @var float
      */
-    protected function file(string $key) {
-        if (!$this->path) {
-            $parent_path = $this->parentPath;
-            if (!$parent_path) {
-                $parent_path = static::PATH_PARENT_DEFAULT;
-            }
-            if (!isset(static::$parentPathsEnsured[$parent_path])) {
-                // Secure absolute path.
-                if (strpos($parent_path, '..') === 0) {
-                    // Remove ../ from final path; assuming that document root is not
-                    // a root dir of the file system.
-                    if (!empty($_SERVER['DOCUMENT_ROOT'])) {
-                        $doc_root_parent = $_SERVER['DOCUMENT_ROOT'];
-                        if (DIRECTORY_SEPARATOR == '/') {
-                            $doc_root_parent = str_replace('\\', '/', $doc_root_parent);
-                        }
-                    } elseif (CliEnvironment::cli()) {
-                        $doc_root_parent = (new CliEnvironment())->documentRoot;
-                        if (!$doc_root_parent) {
-                            throw new ConfigurationException(
-                                'Cannot resolve document root, probably no .document_root file in document root.');
-                        }
-                    } else {
-                        throw new ConfigurationException(
-                            'Cannot resolve document root, _SERVER[DOCUMENT_ROOT] non-existent or empty.');
-                    }
-                    $doc_root_parent = dirname($doc_root_parent);
-                    if ($doc_root_parent == '/') {
-                        $doc_root_parent = '';
-                    }
-                    $parent_path = $doc_root_parent . substr($parent_path, 2);
-                }
-                // Relative to current dir is illegal.
-                elseif ($parent_path{0} === '.') {
-                    throw new RuntimeException('Invalid parent path[' . $parent_path . '].');
-                }
-            }
-            // We don't wanna check parent path and (full) store path separately;
-            // checking the latter suffices for most purposes.
-            $store_path = $parent_path . '/' . $this->name;
-            if (!file_exists($store_path)) {
-                if (!mkdir($store_path, static::FILE_MODE_DIR, true)) {
-                    throw new RuntimeException('Failed to create store path[' . $store_path . '].');
-                }
-            }
-            if (!is_writable($store_path)) {
-                throw new RuntimeException('Not writable store path[' . $store_path . '].');
-            }
-            static::$parentPathsEnsured[$parent_path] = true;
-
-            $this->path = $store_path;
-        }
-
-        return $this->path . '/' . $key;
-    }
-
     const DAYS_OF_YEAR = 365.25;
 
     /**
+     * Flawed leap year implementation; uses an average, doesn't check if any
+     * of current year(s) is leap year.
+     *
      * @param int|\DateInterval|null $ttl
      *      Non-empty must be non-negative.
      *
      * @return int
      *      Seconds.
      *
-     * @throws InvalidArgumentException
-     *      Arg ttl wrong type.
+     * @throws \TypeError
      * @throws RuntimeException
      *      Arg ttl resolves to negative integer.
      */
@@ -725,7 +732,7 @@ class FileCache extends Explorable implements CacheInterface
                 }
                 return $ttl;
             }
-            throw new InvalidArgumentException('Time-to-live must be integer, DateInterval or null.');
+            throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
         }
         return 0;
     }
