@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-06-13
+-----------------------------------
+- FileCache implement extension of CacheInterface, which requires an empty()
+  method.
+
 SimpleComplex/Cache 1.x, 2017-06-11
 -----------------------------------
 - FileCache fileMode option. And the class seem to work.

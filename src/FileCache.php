@@ -27,7 +27,7 @@ use SimpleComplex\Cache\Exception\RuntimeException;
  *
  * @package SimpleComplex\Cache
  */
-class FileCache extends Explorable implements CacheInterface
+class FileCache extends Explorable implements CheckEmptyCacheInterface
 {
     // \Psr\SimpleCache\CacheInterface members.---------------------------------
 
@@ -419,7 +419,8 @@ class FileCache extends Explorable implements CacheInterface
     protected $type = 'file';
 
     /**
-     * Path given by argument or class default; absolute or relative.
+     * Path given by argument or class default; absolute
+     * or relative to document root.
      *
      * @var string
      */
@@ -502,20 +503,20 @@ class FileCache extends Explorable implements CacheInterface
     }
 
     /**
-     * Get number of cache items.
+     * Check if the cache store has any items at all.
      *
-     * @return int
+     * @return bool
      */
-    public function size() {
+    public function empty() : bool
+    {
         $cache_dir = $this->pathReal . '/stores/' . $this->name;
-        $count = 0;
         $dir_iterator = new \DirectoryIterator($cache_dir);
         foreach ($dir_iterator as $item) {
             if (!$item->isDot()) {
-                ++$count;
+                return false;
             }
         }
-        return $count;
+        return true;
     }
 
     /**

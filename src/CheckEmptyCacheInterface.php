@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace SimpleComplex\Cache;
 
+use Psr\SimpleCache\CacheInterface;
+
 /**
  * Extension of PSR-16 Simple Cache interface
  *
@@ -16,12 +18,12 @@ namespace SimpleComplex\Cache;
  *
  * @package SimpleComplex\Cache
  */
-interface CacheInterface extends \Psr\SimpleCache\CacheInterface
+interface CheckEmptyCacheInterface extends CacheInterface
 {
     /**
-     * Get number of cache items.
+     * Check if the cache store has any items at all.
      *
-     * @return int
+     * @return bool
      */
-    public function size() : int;
+    public function empty() : bool;
 }
