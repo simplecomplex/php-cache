@@ -9,14 +9,10 @@ declare(strict_types=1);
 
 namespace SimpleComplex\Cache;
 
-use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Utils\Explorable;
-use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\Utils;
 use SimpleComplex\Cache\Exception\CacheInvalidArgumentException;
-use SimpleComplex\Utils\Exception\ConfigurationException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
-use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Cache\Exception\OutOfBoundsException;
 use SimpleComplex\Cache\Exception\RuntimeException;
 
@@ -449,16 +445,6 @@ class FileCache extends Explorable implements CacheInterface
     protected $ttlDefault = 0;
 
     /**
-     * Parent paths ensured to exist and be writable.
-     *
-     * Class var because we don't want to spend the (usually unnecessary) effort
-     * checking (usually the same) path over and over again.
-     *
-     * @var array
-     */
-    protected static $parentPathsEnsured = array();
-
-    /**
      * Create or load cache store.
      *
      * @param string $name
@@ -480,10 +466,8 @@ class FileCache extends Explorable implements CacheInterface
      *      Invalid arg name.
      * @throws \TypeError
      *      Wrong type of arg options bucket.
-     * @throws \SimpleComplex\Utils\Exception\ConfigurationException
-     *      Cannot resolve document root.
-     * @throws RuntimeException
-     *      Unable to create or write to store path.
+     * @throws \Throwable
+     *      Propagated.
      */
     public function __construct(string $name, array $options = [])
     {
@@ -515,6 +499,23 @@ class FileCache extends Explorable implements CacheInterface
         if ($save_settings) {
             $this->saveSettings($settings);
         }
+    }
+
+    /**
+     * Get number of cache items.
+     *
+     * @return int
+     */
+    public function size() {
+        $cache_dir = $this->pathReal . '/stores/' . $this->name;
+        $count = 0;
+        $dir_iterator = new \DirectoryIterator($cache_dir);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                ++$count;
+            }
+        }
+        return $count;
     }
 
     /**
@@ -642,59 +643,17 @@ class FileCache extends Explorable implements CacheInterface
      * @return bool
      *      Whether the path exists already.
      *
-     * @throws ConfigurationException
-     *      If document root cannot be determined.
-     * @throws LogicException
-     *      Algo or configuration error, can't determine whether path is
-     *      absolute or relative.
+     * @throws RuntimeException
+     * @throws \Throwable
+     *      Propagated.
      */
     protected function resolvePath() : bool
     {
-        $path = $this->path;
-        // Absolute.
-        if (
-            strpos($path, '/') !== 0
-            && (DIRECTORY_SEPARATOR === '/' || strpos($path, ':') !== 1)
-        ) {
-            // Document root.
-            if (!empty($_SERVER['DOCUMENT_ROOT'])) {
-                $doc_root = $_SERVER['DOCUMENT_ROOT'];
-                if (DIRECTORY_SEPARATOR == '/') {
-                    $doc_root = str_replace('\\', '/', $doc_root);
-                }
-            } elseif (CliEnvironment::cli()) {
-                $doc_root = (new CliEnvironment())->documentRoot;
-                if (!$doc_root) {
-                    throw new ConfigurationException(
-                        'Cannot resolve document root, probably no .document_root file in document root.');
-                }
-            } else {
-                throw new ConfigurationException(
-                    'Cannot resolve document root, _SERVER[DOCUMENT_ROOT] non-existent or empty.');
-            }
-            // Relative above document root.
-            if (strpos($path, '../') === 0) {
-                $path = dirname($doc_root) . substr($path, 2);
-            }
-            // Relative to self of document root.
-            elseif (strpos($path, './') === 0) {
-                $path = $doc_root . substr($path, 1);
-            }
-            else {
-                throw new LogicException(
-                    'Algo or configuration error, failed to determine whether path[' . $path
-                    . '] is absolute or relative.'
-                );
-            }
-        }
-        if (strpos($path, '/./') || strpos($path, '/../')) {
-            throw new RuntimeException('Path doesn\'t resolve to an absolute path[' . $path . ']');
-        }
-        $this->pathReal = $path;
+        $this->pathReal = Utils::getInstance()->resolvePath($this->path);
 
-        if (file_exists($path)) {
-            if (!is_dir($path)) {
-                throw new RuntimeException('Path exists but is not directory, path[' . $path . ']');
+        if (file_exists($this->pathReal)) {
+            if (!is_dir($this->pathReal)) {
+                throw new RuntimeException('Path exists but is not directory, path[' . $this->pathReal . ']');
             }
             return true;
         }
@@ -756,7 +715,7 @@ class FileCache extends Explorable implements CacheInterface
      * @throws RuntimeException
      *      Failing to write settings to file.
      */
-    protected function saveSettings(array $settings) /*:void*/
+    protected function saveSettings(array $settings) /*: void*/
     {
         $file = $this->pathReal . '/' . $this->name . '.ini';
         $content = Utils::getInstance()->iterableToIniString($settings);
