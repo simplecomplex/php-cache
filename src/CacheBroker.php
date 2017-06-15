@@ -147,7 +147,7 @@ class CacheBroker extends Explorable
 
         // NB: First cache implementation's constructor param must be $name,
         // and this $storeConstructorArgs must not contain that argument.
-        // Not sure this is such a great idea.
+        // Actually not sure if that is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
         $class = static::CLASS_BY_TYPE['file'];
