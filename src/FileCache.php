@@ -46,7 +46,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function get($key, $default = null)
     {
-        if (!$this->keyValidate($key)) {
+        if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
 
@@ -106,7 +106,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function set($key, $value, $ttl = null)
     {
-        if (!$this->keyValidate($key)) {
+        if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
 
@@ -173,7 +173,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function delete($key)
     {
-        if (!$this->keyValidate($key)) {
+        if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
@@ -283,7 +283,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function has($key)
     {
-        if (!$this->keyValidate($key)) {
+        if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         return file_exists($this->pathReal . '/stores/' . $this->name . '/' . $key);
@@ -472,7 +472,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function __construct(string $name, array $options = [])
     {
-        if (!$this->nameValidate($name)) {
+        if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name['
                 . $name . '].');
         }
@@ -587,55 +587,6 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         }
 
         return $diff;
-    }
-
-    /**
-     * Legal non-alphanumeric characters of a key.
-     *
-     * PSR-16 requirements:
-     * - at least: a-zA-Z\d_.
-     * - not: {}()/\@:
-     * - length: >=2 <=64
-     *
-     * These keys are selected because they would work in the most basic cache
-     * implementation; that is: file (dir names and filenames).
-     * Parentheses and colon would have worked too, but forbidden by PSR-16.
-     */
-    const KEY_VALID_NON_ALPHANUM = [
-        '-',
-        '.',
-        '[',
-        ']',
-        '_'
-    ];
-
-    /**
-     * Checks that key is string, and that length and content is legal.
-     *
-     * @param string $key
-     *
-     * @return bool
-     */
-    public function keyValidate(string $key) : bool
-    {
-        $le = strlen($key);
-        if ($le < 2 || $le > 64) {
-            return false;
-        }
-        // Faster than a regular expression.
-        return !!ctype_alnum('A' . str_replace(static::KEY_VALID_NON_ALPHANUM, '', $key));
-    }
-
-    /**
-     * This implementation enforces same rules on store name as cache key.
-     *
-     * @param string $name
-     *
-     * @return bool
-     */
-    public function nameValidate(string $name) : bool
-    {
-        return $this->keyValidate($name);
     }
 
     /**

@@ -21,7 +21,7 @@ namespace SimpleComplex\Cache;
  * - length: >=2 <=64
  *
  * @code
- * use \SimpleComplex\Cache\CacheKey;
+ * use SimpleComplex\Cache\CacheKey;
  *
  * if (!CacheKey::validate($key)) {
  *    throw new \InvalidArgumentException('Arg key is not valid, key[' . $key . '].');

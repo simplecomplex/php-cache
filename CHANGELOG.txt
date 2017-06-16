@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-06-16
+-----------------------------------
+- Use CacheKey::validate() for all name and key arguments.
+
 SimpleComplex/Cache 1.x, 2017-06-13
 -----------------------------------
 - FileCache implement extension of CacheInterface, which requires an empty()

@@ -129,7 +129,6 @@ class CacheBroker extends Explorable
      *      Arg name is empty or contains illegal char(s).
      *
      * @param string $name
-     *      Allows alpha
      * @param mixed ...$storeConstructorArgs
      *      Arguments to the store type class' constructor or make().
      *      If empty, this method will provide fitting arguments.
@@ -138,22 +137,35 @@ class CacheBroker extends Explorable
      */
     public function getStore(string $name, ...$storeConstructorArgs) : CacheInterface
     {
-        if (!$this->nameValidate($name)) {
+        if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         if (isset($this->stores[$name])) {
             return $this->stores[$name];
         }
+        $this->stores[$name] = $store = $this->instantiateStore($name, $storeConstructorArgs);
+        $this->explorableIndex[] = $name;
+        return $store;
+    }
 
+    /**
+     * Allows extending class to determine which and how to instantiate
+     * a CacheInterface implementation.
+     *
+     * @param string $name
+     * @param array $storeConstructorArgs
+     *
+     * @return \Psr\SimpleCache\CacheInterface
+     */
+    protected function instantiateStore(string $name, array $storeConstructorArgs) : CacheInterface
+    {
         // NB: First cache implementation's constructor param must be $name,
         // and this $storeConstructorArgs must not contain that argument.
         // Actually not sure if that is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
         $class = static::CLASS_BY_TYPE['file'];
-        $this->stores[$name] = $store = new $class(...$storeConstructorArgs);
-        $this->explorableIndex[] = $name;
-        return $store;
+        return new $class(...$storeConstructorArgs);
     }
 
     /**
@@ -166,7 +178,7 @@ class CacheBroker extends Explorable
      */
     public function hasStore(string $name) : bool
     {
-        if (!$this->nameValidate($name)) {
+        if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         return isset($this->stores[$name]);
@@ -183,42 +195,11 @@ class CacheBroker extends Explorable
      */
     public function registerStore(string $name, CacheInterface $store) : bool
     {
-        if (!$this->nameValidate($name)) {
+        if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
         }
         $this->stores[$name] = $store;
         $this->explorableIndex[] = $name;
         return true;
-    }
-
-    /**
-     * Legal non-alphanumeric characters of a store name.
-     *
-     * Rules like PSR-16 minimum requirements for cache key:
-     * - chars: a-zA-Z\d_.
-     * - length: >=2 <=64
-     */
-    const NAME_VALID_NON_ALPHANUM = [
-        '_',
-        '.',
-    ];
-
-    /**
-     * Checks that key is non-empty and only contains legal chars.
-     *
-     * @param string $name
-     *      Allows alphanum, underscore and hyphen.
-     *      Min. length 2, max. length 64.
-     *
-     * @return bool
-     */
-    public function nameValidate(string $name) : bool
-    {
-        $le = strlen($name);
-        if ($le < 2 || $le > 64) {
-            return false;
-        }
-        // Faster than a regular expression.
-        return !!ctype_alnum('A' . str_replace(static::NAME_VALID_NON_ALPHANUM, '', $name));
     }
 }
