@@ -318,7 +318,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
             case 'ttlDefault':
                 return $this->{$name};
         }
-        throw new OutOfBoundsException(get_class($this) . ' instance has no property[' . $name . '].');
+        throw new OutOfBoundsException(get_class($this) . ' instance exposes no property[' . $name . '].');
     }
 
     /**
@@ -340,7 +340,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
             case 'ttlDefault':
                 throw new RuntimeException(get_class($this) . ' instance property[' . $name . '] is read-only.');
         }
-        throw new OutOfBoundsException(get_class($this) . ' instance has no property[' . $name . '].');
+        throw new OutOfBoundsException(get_class($this) . ' instance exposes no property[' . $name . '].');
     }
 
     /**
