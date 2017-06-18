@@ -310,13 +310,13 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      */
     public function __get($name)
     {
-        switch ($name) {
+        switch ('' . $name) {
             case 'name':
             case 'type':
             case 'path':
             case 'fileMode':
             case 'ttlDefault':
-                return $this->{$name};
+                return $this->{'' . $name};
         }
         throw new OutOfBoundsException(get_class($this) . ' instance exposes no property[' . $name . '].');
     }
@@ -332,9 +332,9 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      * @throws RuntimeException
      *      If that instance property is read-only.
      */
-    public function __set(string $name, $value) /*: void*/
+    public function __set($name, $value) /*: void*/
     {
-        switch ($name) {
+        switch ('' . $name) {
             case 'name':
             case 'type':
             case 'ttlDefault':

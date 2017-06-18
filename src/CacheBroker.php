@@ -41,10 +41,10 @@ class CacheBroker extends Explorable
      * @throws OutOfBoundsException
      *      If no such instance property.
      */
-    public function __get(string $name)
+    public function __get($name)
     {
-        if (isset($this->stores[$name])) {
-            return $this->stores[$name];
+        if (isset($this->stores['' . $name])) {
+            return $this->stores['' . $name];
         }
         throw new OutOfBoundsException(get_class($this) . ' instance has no store[' . $name . '].');
     }
@@ -62,9 +62,9 @@ class CacheBroker extends Explorable
      * @throws RuntimeException
      *      If such instance property declared.
      */
-    public function __set(string $name, $value) /*: void*/
+    public function __set($name, $value) /*: void*/
     {
-        switch ($name) {
+        switch ('' . $name) {
             case 'stores':
                 throw new RuntimeException(get_class($this) . ' instance store[' . $name . '] is read-only.');
         }
