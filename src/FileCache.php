@@ -65,10 +65,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
             if (!$end_of_life) {
                 throw new RuntimeException('Failed to get modified time of file[' . $file . '].');
             }
-            if ($end_of_life < time()) {
-                // Old.
-                // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
-                @unlink($file);
+            $time = time();
+            if ($end_of_life < $time) {
+                if (
+                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE)
+                    < $time
+                ) {
+                    // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
+                    @unlink($file);
+                }
 
                 return $default;
             }
@@ -200,7 +205,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
         $dir_iterator = new \DirectoryIterator($cache_dir);
         foreach ($dir_iterator as $item) {
             if (!$item->isDot()) {
-                unlink($cache_dir . '/' . $item->getFilename());
+                @unlink($cache_dir . '/' . $item->getFilename());
             }
         }
         return true;
@@ -379,8 +384,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @param int|\DateInterval $ttl
      *
-     * @return $this|FileCache
-     *      This method is chainable.
+     * @return void
      *
      * @throws \TypeError
      *      Propagated.
@@ -399,7 +403,6 @@ class FileCache extends Explorable implements ManagableCacheInterface
                 'ttlIgnore' => $this->ttlIgnore,
             ]);
         }
-        return $this;
     }
 
     /**
@@ -408,8 +411,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @param bool $ignore
      *
-     * @return $this
-     *      This method is chainable.
+     * @return void
      */
     public function setTtlIgnore(bool $ignore)
     {
@@ -422,9 +424,35 @@ class FileCache extends Explorable implements ManagableCacheInterface
                 'ttlIgnore' => $this->ttlIgnore,
             ]);
         }
-        return $this;
     }
 
+    /**
+     * Deletes all cache items that have reached end of life.
+     *
+     * @return int
+     *      Number of items cleared.
+     */
+    public function clearExpired() : int
+    {
+        $deleted = 0;
+        // Unless time-to-live is to be ignored by all methods/procedures.
+        if ($this->ttlDefault || !$this->ttlIgnore) {
+            $grace = $this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE;
+            $cache_dir = $this->pathReal . '/stores/' . $this->name;
+            $dir_iterator = new \DirectoryIterator($cache_dir);
+            foreach ($dir_iterator as $item) {
+                if (
+                    !$item->isDot()
+                    && ($end_of_life = @$item->getMTime())
+                    && $end_of_life < time() + $grace
+                ) {
+                    @unlink($cache_dir . '/' . $item->getFilename());
+                    ++$deleted;
+                }
+            }
+        }
+        return $deleted;
+    }
 
     // Custom.------------------------------------------------------------------
 
@@ -495,6 +523,21 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @var int
      */
     const TTL_IGNORE = false;
+
+    /**
+     * Grace period in which a ttl expired item should not be deleted.
+     * May reduce the risk of current saving/deleting procedures.
+     * Avoid values that are a multiple of common ttl values; for this
+     * particular cache store.
+     *
+     * This default value is only used if the store has no (zero) default
+     * time-to-live.
+     * Whenever the default time-to-live is set (to non-zero), the grace
+     * period will be 0.5 times the default time-to-live.
+     *
+     * @var int
+     */
+    const GARBAGE_COLLECTION_GRACE = 15 * 60;
 
     /**
      * Cache store name.
@@ -568,7 +611,6 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *      @var int|\DateInterval|null $ttlDefault = null
      *          Null: preexisting setting or class default (TTL_DEFAULT) rules.
      *          Zero: forever.
-     *          Positive int: seconds.
      *      @var bool|null $ttlIgnore = null
      *          Null: preexisting setting or class default (TTL_IGNORE) rules.
      *          True: item setters and getters' ttl argument gets ignored.

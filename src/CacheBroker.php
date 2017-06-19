@@ -36,7 +36,7 @@ class CacheBroker extends Explorable
      *
      * @param string $name
      *
-     * @return CacheInterface
+     * @return CacheInterface|ManagableCacheInterface
      *
      * @throws OutOfBoundsException
      *      If no such instance property.
@@ -133,7 +133,7 @@ class CacheBroker extends Explorable
      *      Arguments to the store type class' constructor or make().
      *      If empty, this method will provide fitting arguments.
      *
-     * @return \Psr\SimpleCache\CacheInterface
+     * @return \Psr\SimpleCache\CacheInterface|ManagableCacheInterface
      */
     public function getStore(string $name, ...$storeConstructorArgs) : CacheInterface
     {
@@ -155,7 +155,7 @@ class CacheBroker extends Explorable
      * @param string $name
      * @param array $storeConstructorArgs
      *
-     * @return \Psr\SimpleCache\CacheInterface
+     * @return \Psr\SimpleCache\CacheInterface|ManagableCacheInterface
      */
     protected function instantiateStore(string $name, array $storeConstructorArgs) : CacheInterface
     {
@@ -189,7 +189,7 @@ class CacheBroker extends Explorable
      *      Arg name is empty or contains illegal char(s).
      *
      * @param string $name
-     * @param CacheInterface $store
+     * @param CacheInterface|ManagableCacheInterface $store
      *
      * @return bool
      */

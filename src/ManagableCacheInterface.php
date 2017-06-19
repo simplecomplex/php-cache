@@ -42,16 +42,14 @@ interface ManagableCacheInterface extends CacheInterface
      *
      * @param int|\DateInterval $ttl
      *
-     * @return $this
-     *      This method must be chainable.
-     *
+     * @return void
      *
      * @throws \TypeError
      *      If arg ttl isn't integer or DateInterval.
      * @throws \InvalidArgumentException
      *      If arg ttl is negative integer.
      */
-    public function setTtlDefault($ttl) /*: ManagableCacheInterface*/;
+    public function setTtlDefault($ttl);
 
     /**
      * Control whether the cache store should ignore $ttl argument
@@ -62,8 +60,22 @@ interface ManagableCacheInterface extends CacheInterface
      *
      * @param bool $ignore
      *
-     * @return $this
-     *      This method must be chainable.
+     * @return void
      */
-    public function setTtlIgnore(bool $ignore) /*: ManagableCacheInterface*/;
+    public function setTtlIgnore(bool $ignore);
+
+    /**
+     * Deletes all cache items that have reached end of life.
+     *
+     * Implementations may chose to return number of cleared items
+     * or boolean.
+     *
+     * @return int|bool
+     *      Int: number of items cleared.
+     *      Bool: success/failure.
+     *
+     * @throws \Throwable
+     *      On failure.
+     */
+    public function clearExpired();
 }
