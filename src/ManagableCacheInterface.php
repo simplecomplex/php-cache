@@ -23,9 +23,12 @@ interface ManagableCacheInterface extends CacheInterface
     /**
      * Check if the cache store has any items at all.
      *
+     * Not named empty() to prevent potential future conflict with 'magic'
+     * container method.
+     *
      * @return bool
      */
-    public function empty() : bool;
+    public function isEmpty() : bool;
 
     /**
      * No time-to-live; in effect forever.
@@ -35,23 +38,32 @@ interface ManagableCacheInterface extends CacheInterface
     const TTL_NONE = 0;
 
     /**
-     * Do not consider time-to-live at all:
-     * i. Ignore ttl arguments to setter and getter methods.
-     * ii. All items live forever.
-     *
-     *
-     * @var int
-     */
-    const TTL_IGNORE = -1;
-
-    /**
      * Set the cache store's default time-to-live.
      *
-     * This method must support constants TTL_NONE/TTL_IGNORE arg default,
-     * but is free to implement the essence of these values in whatever
-     * manner desired.
+     * @param int|\DateInterval $ttl
      *
-     * @param int $default
+     * @return $this
+     *      This method must be chainable.
+     *
+     *
+     * @throws \TypeError
+     *      If arg ttl isn't integer or DateInterval.
+     * @throws \InvalidArgumentException
+     *      If arg ttl is negative integer.
      */
-    public function setDefaultTtl(int $default);
+    public function setTtlDefault($ttl) /*: ManagableCacheInterface*/;
+
+    /**
+     * Control whether the cache store should ignore $ttl argument
+     * of item setters and getters.
+     *
+     * Implementations are furthermore allowed to ignore time-to-live
+     * completely if ignore AND ttl default is none (forever).
+     *
+     * @param bool $ignore
+     *
+     * @return $this
+     *      This method must be chainable.
+     */
+    public function setTtlIgnore(bool $ignore) /*: ManagableCacheInterface*/;
 }

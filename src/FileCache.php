@@ -19,11 +19,15 @@ use SimpleComplex\Cache\Exception\RuntimeException;
 /**
  * PSR-16 Simple Cache file-based.
  *
+ * Not compatible with 32-bit PHP, because 32-bit integer too small to handle
+ * (mock) eternal time-to-live.
+ *
  * @property-read string $name
  * @property-read string $type
  * @property-read string $path
  * @property-read string $fileMode
  * @property-read int $ttlDefault
+ * @property-read bool $ttlIgnore
  *
  * @package SimpleComplex\Cache
  */
@@ -56,7 +60,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
         }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
-        if ($this->ttlDefault > -1) {
+        if ($this->ttlDefault || !$this->ttlIgnore) {
             $end_of_life = filemtime($file);
             if (!$end_of_life) {
                 throw new RuntimeException('Failed to get modified time of file[' . $file . '].');
@@ -141,7 +145,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
         }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
-        if ($this->ttlDefault > -1) {
+        if ($this->ttlDefault || !$this->ttlIgnore) {
             if (!$ttl) {
                 $time_to_live = $ttl === null ? $this->ttlDefault : 0;
             } else {
@@ -291,12 +295,16 @@ class FileCache extends Explorable implements ManagableCacheInterface
 
     // Explorable.--------------------------------------------------------------
 
+    /**
+     * @var array
+     */
     protected $explorableIndex = [
         'name',
         'type',
         'path',
         'fileMode',
         'ttlDefault',
+        'ttlIgnore',
     ];
 
     /**
@@ -309,13 +317,8 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function __get($name)
     {
-        switch ('' . $name) {
-            case 'name':
-            case 'type':
-            case 'path':
-            case 'fileMode':
-            case 'ttlDefault':
-                return $this->{'' . $name};
+        if (in_array($name, $this->explorableIndex, true)) {
+            return $this->{$name};
         }
         throw new OutOfBoundsException(get_class($this) . ' instance exposes no property[' . $name . '].');
     }
@@ -333,11 +336,8 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function __set($name, $value) /*: void*/
     {
-        switch ('' . $name) {
-            case 'name':
-            case 'type':
-            case 'ttlDefault':
-                throw new RuntimeException(get_class($this) . ' instance property[' . $name . '] is read-only.');
+        if (in_array($name, $this->explorableIndex, true)) {
+            throw new RuntimeException(get_class($this) . ' instance property[' . $name . '] is read-only.');
         }
         throw new OutOfBoundsException(get_class($this) . ' instance exposes no property[' . $name . '].');
     }
@@ -362,7 +362,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @return bool
      */
-    public function empty() : bool
+    public function isEmpty() : bool
     {
         $cache_dir = $this->pathReal . '/stores/' . $this->name;
         $dir_iterator = new \DirectoryIterator($cache_dir);
@@ -375,26 +375,54 @@ class FileCache extends Explorable implements ManagableCacheInterface
     }
 
     /**
-     * @param int $default
+     * Set the cache store's default time-to-live.
      *
-     * @return void
+     * @param int|\DateInterval $ttl
      *
-     * @throws InvalidArgumentException
+     * @return $this|FileCache
+     *      This method is chainable.
+     *
+     * @throws \TypeError
+     *      Propagated.
+     * @throws RuntimeException
+     *      Propagated.
      */
-    public function setDefaultTtl(int $default) /*: void*/
+    public function setTtlDefault($ttl)
     {
-        switch ($default) {
-            case ManagableCacheInterface::TTL_IGNORE:
-                break;
-            case ManagableCacheInterface::TTL_NONE:
-                break;
-            default:
-                if ($default < 0) {
-                    throw new InvalidArgumentException(
-
-                    );
-                }
+        $time_to_live = $this->timeToLive($ttl);
+        // Save to settings .ini file, if different.
+        if ($time_to_live != $this->ttlDefault) {
+            $this->ttlDefault = $time_to_live;
+            $this->saveSettings([
+                'fileMode' => $this->fileMode,
+                'ttlDefault' => $this->ttlDefault,
+                'ttlIgnore' => $this->ttlIgnore,
+            ]);
         }
+        return $this;
+    }
+
+    /**
+     * Control whether the cache store should ignore $ttl argument
+     * of setters and getters.
+     *
+     * @param bool $ignore
+     *
+     * @return $this
+     *      This method is chainable.
+     */
+    public function setTtlIgnore(bool $ignore)
+    {
+        // Save to settings .ini file, if different.
+        if ($ignore != $this->ttlIgnore) {
+            $this->ttlIgnore = $ignore;
+            $this->saveSettings([
+                'fileMode' => $this->fileMode,
+                'ttlDefault' => $this->ttlDefault,
+                'ttlIgnore' => $this->ttlIgnore,
+            ]);
+        }
+        return $this;
     }
 
 
@@ -442,7 +470,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
     /**
      * There's no such thing as eternity.
      *
-     * Will break in 32-bit system.
+     * Incompatible with 32-bit PHP.
      *
      * @var int
      */
@@ -452,13 +480,21 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * Default time-to-live.
      *
      * Values:
-     * - minus one: forever, and ttl arg to set method ignored
-     * - zero: forever, used when set method ttl arg null.
-     * - positive: used when set method ttl arg null.
+     * - zero: forever.
+     * - positive: seconds.
      *
      * @var int
      */
     const TTL_DEFAULT = 0;
+
+    /**
+     * Ignore $ttl argument of item setters and getters.
+     *
+     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     *
+     * @var int
+     */
+    const TTL_IGNORE = false;
 
     /**
      * Cache store name.
@@ -500,13 +536,21 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * Default time-to-live.
      *
      * Values:
-     * - minus one: forever, and ttl arg to set method ignored
      * - zero: forever, used when set method ttl arg null.
      * - positive: used when set method ttl arg null.
      *
      * @var integer
      */
     protected $ttlDefault = 0;
+
+    /**
+     * Ignore $ttl argument of item setters and getters.
+     *
+     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     *
+     * @var integer
+     */
+    protected $ttlIgnore = false;
 
     /**
      * Create or load cache store.
@@ -523,10 +567,14 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *          will only apply to new cache files.
      *      @var int|\DateInterval|null $ttlDefault = null
      *          Null: preexisting setting or class default (TTL_DEFAULT) rules.
-     *          Minus one: forever, and ttl arg to set method ignored.
-     *          Zero: forever, used when set method ttl arg null.
-     *          Positive int: used when set method ttl arg null.
+     *          Zero: forever.
+     *          Positive int: seconds.
+     *      @var bool|null $ttlIgnore = null
+     *          Null: preexisting setting or class default (TTL_IGNORE) rules.
+     *          True: item setters and getters' ttl argument gets ignored.
      * }
+     * @throws \LogicException
+     *      If PHP is 32-bit.
      * @throws InvalidArgumentException
      *      Invalid arg name.
      * @throws \TypeError
@@ -536,6 +584,11 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function __construct(string $name, array $options = [])
     {
+        if (PHP_INT_SIZE < 8) {
+            throw new \LogicException(
+                get_class($this) . ' is not compatible with 32-bit PHP.'
+            );
+        }
         if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name['
                 . $name . '].');
@@ -588,6 +641,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
 
         // fileMode.
         if (!empty($options['fileMode'])) {
+            // empty() also handles null; that existing setting must rule.
             if (!is_string($options['fileMode'])) {
                 throw new \TypeError('Arg options[fileMode] type['
                     . (!is_object($options['fileMode']) ? gettype($options['fileMode']) :
@@ -617,10 +671,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
 
         // ttlDefault.
         if (isset($options['ttlDefault'])) {
+            // isset() also handles null; that existing setting must rule.
             if (!$options['ttlDefault']) {
                 $this->ttlDefault = 0;
-            } elseif ($options['ttlDefault'] === -1) {
-                $this->ttlDefault = -1;
             } else {
                 $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
             }
@@ -634,8 +687,16 @@ class FileCache extends Explorable implements ManagableCacheInterface
             $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
             // And no settings means diff is already true.
         }
-        if (!$this->ttlDefault) {
-            $this->ttlDefault = static::TTL_FOREVER;
+        // ttlIgnore.
+        if (isset($options['ttlIgnore'])) {
+            // isset() also handles null; that existing setting must rule.
+            $this->ttlIgnore = !!$options['ttlIgnore'];
+
+        } elseif ($settings_exist) {
+            $this->ttlIgnore = $settings['ttlIgnore'];
+        } else {
+            $settings['ttlIgnore'] = $this->ttlIgnore = static::TTL_IGNORE;
+            // And no settings means diff is already true.
         }
 
         return $diff;
