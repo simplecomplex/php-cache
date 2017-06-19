@@ -73,9 +73,6 @@ interface ManagableCacheInterface extends CacheInterface
      * @return int|bool
      *      Int: number of items cleared.
      *      Bool: success/failure.
-     *
-     * @throws \Throwable
-     *      On failure.
      */
     public function clearExpired();
 }

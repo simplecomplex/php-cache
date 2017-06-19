@@ -896,4 +896,39 @@ class FileCache extends Explorable implements ManagableCacheInterface
         }
         return 0;
     }
+
+    // @todo: create cli script that uses getInstances() to clearExpired(); for cron.
+
+    /**
+     * Finds all stores that has been created using that path,
+     * instantiates them, and returns a list of them.
+     *
+     * Looks for [store name].ini files in the path.
+     *
+     * @see FileCache::PATH_DEFAULT
+     *
+     * @param string $path
+     *      Defaults to class var PATH_DEFAULT.
+     *
+     * @return array
+     */
+    public static function getInstances($path = '')
+    {
+        $absolute_path = Utils::getInstance()->resolvePath($path ? $path : static::PATH_DEFAULT);
+        if (file_exists($absolute_path)) {
+            if (!is_dir($absolute_path)) {
+                throw new RuntimeException('Path exists but is not directory, path[' . $absolute_path . ']');
+            }
+            $instances = [];
+            $dir_iterator = new \DirectoryIterator($absolute_path);
+            foreach ($dir_iterator as $item) {
+                if (!$item->isDot() && $item->getExtension() == 'ini') {
+                    $name = $item->getBasename('.ini');
+                    $instances[] = static::__construct($name);
+                }
+            }
+            return $instances;
+        }
+        return [];
+    }
 }
