@@ -27,7 +27,7 @@ use SimpleComplex\Cache\Exception\RuntimeException;
  *
  * @package SimpleComplex\Cache
  */
-class FileCache extends Explorable implements CheckEmptyCacheInterface
+class FileCache extends Explorable implements ManagableCacheInterface
 {
     // \Psr\SimpleCache\CacheInterface members.---------------------------------
 
@@ -56,7 +56,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
-        if ($this->ttlDefault) {
+        if ($this->ttlDefault > -1) {
             $end_of_life = filemtime($file);
             if (!$end_of_life) {
                 throw new RuntimeException('Failed to get modified time of file[' . $file . '].');
@@ -141,15 +141,14 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         }
 
         // Unless time-to-live is to be ignored by all methods/procedures.
-        if ($this->ttlDefault) {
+        if ($this->ttlDefault > -1) {
             if (!$ttl) {
-                if ($ttl === null) {
-                    $time_to_live = $this->ttlDefault;
-                } else {
-                    $time_to_live = 0;
-                }
+                $time_to_live = $ttl === null ? $this->ttlDefault : 0;
             } else {
                 $time_to_live = $this->timeToLive($ttl);
+            }
+            if (!$time_to_live) {
+                $time_to_live = static::TTL_FOREVER;
             }
             if (
                 $time_to_live
@@ -356,6 +355,49 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
     }
 
 
+    // ManagableCacheInterface.-------------------------------------------------
+
+    /**
+     * Check if the cache store has any items at all.
+     *
+     * @return bool
+     */
+    public function empty() : bool
+    {
+        $cache_dir = $this->pathReal . '/stores/' . $this->name;
+        $dir_iterator = new \DirectoryIterator($cache_dir);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @param int $default
+     *
+     * @return void
+     *
+     * @throws InvalidArgumentException
+     */
+    public function setDefaultTtl(int $default) /*: void*/
+    {
+        switch ($default) {
+            case ManagableCacheInterface::TTL_IGNORE:
+                break;
+            case ManagableCacheInterface::TTL_NONE:
+                break;
+            default:
+                if ($default < 0) {
+                    throw new InvalidArgumentException(
+
+                    );
+                }
+        }
+    }
+
+
     // Custom.------------------------------------------------------------------
 
     /**
@@ -398,7 +440,21 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
     const FILE_MODE_DEFAULT = 'user';
 
     /**
+     * There's no such thing as eternity.
+     *
+     * Will break in 32-bit system.
+     *
+     * @var int
+     */
+    const TTL_FOREVER = 1000 * 365 * 24 * 60 * 60;
+
+    /**
      * Default time-to-live.
+     *
+     * Values:
+     * - minus one: forever, and ttl arg to set method ignored
+     * - zero: forever, used when set method ttl arg null.
+     * - positive: used when set method ttl arg null.
      *
      * @var int
      */
@@ -441,6 +497,13 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
     protected $fileMode = '';
 
     /**
+     * Default time-to-live.
+     *
+     * Values:
+     * - minus one: forever, and ttl arg to set method ignored
+     * - zero: forever, used when set method ttl arg null.
+     * - positive: used when set method ttl arg null.
+     *
      * @var integer
      */
     protected $ttlDefault = 0;
@@ -460,8 +523,9 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
      *          will only apply to new cache files.
      *      @var int|\DateInterval|null $ttlDefault = null
      *          Null: preexisting setting or class default (TTL_DEFAULT) rules.
-     *          Zero: forever, and ttl argument to set method will be ignored.
-     *          Positive int: used when set method receives null ttl argument.
+     *          Minus one: forever, and ttl arg to set method ignored.
+     *          Zero: forever, used when set method ttl arg null.
+     *          Positive int: used when set method ttl arg null.
      * }
      * @throws InvalidArgumentException
      *      Invalid arg name.
@@ -500,23 +564,6 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         if ($save_settings) {
             $this->saveSettings($settings);
         }
-    }
-
-    /**
-     * Check if the cache store has any items at all.
-     *
-     * @return bool
-     */
-    public function empty() : bool
-    {
-        $cache_dir = $this->pathReal . '/stores/' . $this->name;
-        $dir_iterator = new \DirectoryIterator($cache_dir);
-        foreach ($dir_iterator as $item) {
-            if (!$item->isDot()) {
-                return false;
-            }
-        }
-        return true;
     }
 
     /**
@@ -572,6 +619,8 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         if (isset($options['ttlDefault'])) {
             if (!$options['ttlDefault']) {
                 $this->ttlDefault = 0;
+            } elseif ($options['ttlDefault'] === -1) {
+                $this->ttlDefault = -1;
             } else {
                 $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
             }
@@ -584,6 +633,9 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
         } else {
             $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
             // And no settings means diff is already true.
+        }
+        if (!$this->ttlDefault) {
+            $this->ttlDefault = static::TTL_FOREVER;
         }
 
         return $diff;
@@ -735,7 +787,7 @@ class FileCache extends Explorable implements CheckEmptyCacheInterface
                         . '].'
                     );
                 }
-                return $ttl;
+                return $secs;
             }
             throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
         }
