@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-06-21
+-----------------------------------
+- Don't use 'iterable' type; effectively useless because stdClass is iterable
+  but not 'iterable' (PHP still sucks type-wise).
+
 SimpleComplex/Cache 1.x, 2017-06-18
 -----------------------------------
 - Require 64-bit PHP.

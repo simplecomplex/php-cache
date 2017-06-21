@@ -212,7 +212,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
     }
 
     /**
-     * @param iterable $keys
+     * @param array|object $keys
      * @param mixed|null $default
      *
      * @return array
@@ -221,9 +221,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function getMultiple($keys, $default = null)
     {
-        if (!Utils::getInstance()->isIterable($keys)) {
+        if (!is_array($keys) && !is_object($keys)) {
             throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not iterable.'
+                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
             );
         }
         $list = [];
@@ -234,7 +234,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
     }
 
     /**
-     * @param iterable $values
+     * @param array|object $values
      * @param int|\DateInterval|null $ttl
      *      Null: uses the instance' default ttl.
      *      Zero: forever, no end of life.
@@ -245,10 +245,10 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function setMultiple($values, $ttl = null)
     {
-        if (!Utils::getInstance()->isIterable($values)) {
+        if (!is_array($values) && !is_object($values)) {
             throw new \TypeError(
                 'Arg values type[' . (!is_object($values) ? gettype($values) : get_class($values))
-                . '] is not iterable.'
+                . '] is not array|object.'
             );
         }
         foreach ($values as $key => $value) {
@@ -260,7 +260,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
     }
 
     /**
-     * @param iterable $keys
+     * @param array|object $keys
      *
      * @return bool
      *
@@ -268,9 +268,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
      */
     public function deleteMultiple($keys)
     {
-        if (!Utils::getInstance()->isIterable($keys)) {
+        if (!is_array($keys) && !is_object($keys)) {
             throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not iterable.'
+                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
             );
         }
         foreach ($keys as $key) {
@@ -825,7 +825,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
     protected function saveSettings(array $settings) /*: void*/
     {
         $file = $this->pathReal . '/' . $this->name . '.ini';
-        $content = Utils::getInstance()->iterableToIniString($settings);
+        $content = Utils::getInstance()->containerToIniString($settings);
         $set_mode = $this->fileMode != 'user' && !file_exists($file);
         if (!file_put_contents($file, $content)) {
             throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
