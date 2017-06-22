@@ -47,6 +47,6 @@ declare(strict_types=1);
 
 // Work.------------------------------------------------------------------------
 
-use SimpleComplex\Cache\CliFileCache;
+use SimpleComplex\Cache\CliCache;
 
-new CliFileCache();
+new CliCache();
