@@ -105,6 +105,8 @@ class CliCache implements CliCommandInterface
      */
     protected function getMainInstance()
     {
+        // getInstance() returns first CacheBroker or CacheBroker child
+        // instantiated via getInstance().
         return CacheBroker::getInstance();
     }
 
@@ -138,11 +140,14 @@ class CliCache implements CliCommandInterface
                         'Empty \'store\' argument.';
                 }
                 else {
-                    echo $command->arguments['store'] . "\n";
+                    echo 'store: ' . $command->arguments['store'] . "\n";
                 }
                 if (empty($command->arguments['key'])) {
                     $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'key\' argument.' :
                         'Empty \'key\' argument.';
+                }
+                else {
+                    echo 'key: ' . $command->arguments['key'] . "\n";
                 }
                 $environment = CliEnvironment::getInstance();
                 if ($command->inputErrors) {
@@ -157,7 +162,8 @@ class CliCache implements CliCommandInterface
                     exit;
                 }
                 // Execute.
-                $environment->echoMessage('Now do execute...' . "\n" . $command);
+                $environment->echoMessage('Now do execute...');
+                echo \SimpleComplex\Inspect\Inspect::getInstance()->inspect($command) . "\n";
 
                 exit;
             default:

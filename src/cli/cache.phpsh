@@ -45,8 +45,18 @@ declare(strict_types=1);
 // /Include Composer autoloader - re-usable snippet.----------------------------
 
 
+
+
 // Work.------------------------------------------------------------------------
 
+use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Cache\CliCache;
 
+// Declares JsonLog's CLI commands, and registers them to CliEnvironment.
 new CliCache();
+
+// Let CliEnvironment listen to input and forward matched command
+// to it's provider (in this case CliJsonLog or CliEnvironment self).
+CliEnvironment::getInstance()->forwardMatchedCommand();
+
+exit;
