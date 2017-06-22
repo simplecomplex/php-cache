@@ -41,7 +41,7 @@ class CliCache implements CliCommandInterface
     const COMMAND_PROVIDER_ALIAS = 'cache';
 
     /**
-     * Uses CliEnvironment/CliCommand to detect and execute commands.
+     * Registers CacheBroker CliCommands at CliEnvironment.
      *
      * @throws \LogicException
      *      If executed in non-CLI mode.
@@ -54,7 +54,7 @@ class CliCache implements CliCommandInterface
 
         $environment = CliEnvironment::getInstance();
         // Declare supported commands.
-        $environment->addCommandsAvailable(
+        $environment->registerCommands(
             new CliCommand(
                 $this,
                 static::COMMAND_PROVIDER_ALIAS . '-clear',
@@ -71,7 +71,7 @@ class CliCache implements CliCommandInterface
                 static::COMMAND_PROVIDER_ALIAS . '-clear-expired',
                 'Delete all expired cache items of one or all cache stores.',
                 [
-                    'store' => 'Cache store name. Optional if arg \'all\'.',
+                    'store' => 'Cache store name. Optional if option \'all\'.',
                 ],
                 [
                     'all' => 'All cache stores.',
@@ -85,7 +85,7 @@ class CliCache implements CliCommandInterface
                 static::COMMAND_PROVIDER_ALIAS . '-clear-all',
                 'Delete all cache items of one or all cache stores.',
                 [
-                    'store' => 'Cache store name. Optional if arg \'all\'.',
+                    'store' => 'Cache store name. Optional if option \'all\'.',
                 ],
                 [
                     'all' => 'All cache stores.',
@@ -95,6 +95,28 @@ class CliCache implements CliCommandInterface
                 ]
             )
         );
+    }
+
+    /**
+     * To use class extending CacheBroker, call [ExtendedCacheBroker]::getInstance()
+     * before instantiating CliCache.
+     *
+     * @return \SimpleComplex\Cache\CacheBroker
+     */
+    protected function getMainInstance()
+    {
+        return CacheBroker::getInstance();
+    }
+
+
+    // CliCommandInterface.-----------------------------------------------------
+
+    /**
+     * @return string
+     */
+    public function commandProviderAlias(): string
+    {
+        return static::COMMAND_PROVIDER_ALIAS;
     }
 
     /**
