@@ -52,9 +52,9 @@ class CliCache implements CliCommandInterface
             throw new \LogicException('Cli mode only.');
         }
 
-        $environment = CliEnvironment::getInstance();
+        $cli_env = CliEnvironment::getInstance();
         // Declare supported commands.
-        $environment->registerCommands(
+        $cli_env->registerCommands(
             new CliCommand(
                 $this,
                 static::COMMAND_PROVIDER_ALIAS . '-clear',
@@ -135,49 +135,56 @@ class CliCache implements CliCommandInterface
     {
         switch ($command->name) {
             case static::COMMAND_PROVIDER_ALIAS . '-clear':
+                $store = $key = '';
+                // Validate input. ---------------------------------------------
                 if (empty($command->arguments['store'])) {
                     $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'store\' argument.' :
                         'Empty \'store\' argument.';
-                }
-                else {
-                    echo 'store: ' . $command->arguments['store'] . "\n";
+                } else {
+                    $store = $command->arguments['store'];
                 }
                 if (empty($command->arguments['key'])) {
                     $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'key\' argument.' :
                         'Empty \'key\' argument.';
+                } else {
+                    $key = $command->arguments['key'];
                 }
-                else {
-                    echo 'key: ' . $command->arguments['key'] . "\n";
-                }
-                $environment = CliEnvironment::getInstance();
+                // Dependency.
+                $cli_env = CliEnvironment::getInstance();
                 if ($command->inputErrors) {
                     foreach ($command->inputErrors as $msg) {
-                        $environment->echoMessage(
-                            $environment->format($msg, 'hangingIndent'),
+                        $cli_env->echoMessage(
+                            $cli_env->format($msg, 'hangingIndent'),
                             'notice'
                         );
                     }
                     // This command's help text.
-                    $environment->echoMessage("\n" . $command);
+                    $cli_env->echoMessage("\n" . $command);
                     exit;
                 }
-                // Execute.
-                /*echo "Are you sure you want to do this?  Type 'yes' to continue: ";
-                $handle = fopen ("php://stdin","r");
-                $line = fgets($handle);
-                if(trim($line) != 'yes'){
-                    echo "ABORTING!\n";
-                    exit;
-                }
-                fclose($handle);
-                echo "\n";
-                echo "Thank you, continuing...\n";
-                */
-                if (!$this->confirm()) {
+                // Display command and the arg values used.---------------------
+                $cli_env->echoMessage(
+                    $cli_env->format(
+                        $cli_env->format($command->name, 'emphasize') . ': ' . $command->description
+                        . "\n" . 'store: ' . $store
+                        . "\n" . 'key: ' . $key,
+                        'hangingIndent'
+                    )
+                );
+                // Check if the command is doable.------------------------------
+                $cache_store = CacheBroker::getInstance()->getStore($store);
+                if (!$cache_store) {
+                    $cli_env->echoMessage('Failed to get cache store.', 'error');
                     exit;
                 }
 
-                $environment->echoMessage('Now do execute...');
+
+
+                if (!$command->preConfirmed && !$cli_env->confirm()) {
+                    exit;
+                }
+
+                $cli_env->echoMessage('Now do execute...');
                 echo \SimpleComplex\Inspect\Inspect::getInstance()->inspect($command)->toString(true) . "\n";
 
                 exit;
