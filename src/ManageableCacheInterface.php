@@ -18,7 +18,7 @@ use Psr\SimpleCache\CacheInterface;
  *
  * @package SimpleComplex\Cache
  */
-interface ManagableCacheInterface extends CacheInterface
+interface ManageableCacheInterface extends CacheInterface
 {
     /**
      * Check if the cache store has any items at all.
@@ -75,4 +75,30 @@ interface ManagableCacheInterface extends CacheInterface
      *      Bool: success/failure.
      */
     public function clearExpired();
+
+    /**
+     * Destroys the whole cache store; it's configuration and all items.
+     *
+     * Must call clear() before removind store configuration.
+     *
+     * @see CacheInterface::clear()
+     *
+     * @return bool
+     */
+    public function destroy();
+
+    /**
+     * Finds all stores created via this class (or at least all instances
+     * related to some configuration),
+     * instantiates them, and returns a list of them.
+     *
+     * Static methods make little sense in interface.
+     * On the other hand, it wouldn't make sense to implement such a method
+     * as an instance method.
+     * And this method is an inevitable requirement if cache stores are to be
+     * manageable.
+     *
+     * @return mixed
+     */
+    public static function listInstances();
 }

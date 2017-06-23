@@ -31,7 +31,7 @@ use SimpleComplex\Cache\Exception\RuntimeException;
  *
  * @package SimpleComplex\Cache
  */
-class FileCache extends Explorable implements ManagableCacheInterface
+class FileCache extends Explorable implements ManageableCacheInterface
 {
     // \Psr\SimpleCache\CacheInterface members.---------------------------------
 
@@ -47,11 +47,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *      If this store's ttlDefault isn't zero, and checking file's modified
      *      time fails.
      *      If failing to read file.
+     *      If this store is destroyed.
      */
     public function get($key, $default = null)
     {
         if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
 
         $file = $this->pathReal . '/stores/' . $this->name . '/' . $key;
@@ -112,11 +116,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *      Failing to serialize.
      *      Failing to write to file.
      *      Failing to set modified time of file.
+     *      If this store is destroyed.
      */
     public function set($key, $value, $ttl = null)
     {
         if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
 
         $serialized = serialize($value);
@@ -178,11 +186,16 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @throws CacheInvalidArgumentException
      *      Arg key invalid.
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function delete($key)
     {
         if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
         // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
         @unlink($this->pathReal . '/stores/' . $this->name . '/' . $key);
@@ -198,9 +211,14 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *      If this store's cache dir cannot be opened.
      * @throws \RuntimeException
      *      On other failures.
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function clear()
     {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
         $cache_dir = $this->pathReal . '/stores/' . $this->name;
         $dir_iterator = new \DirectoryIterator($cache_dir);
         foreach ($dir_iterator as $item) {
@@ -218,6 +236,8 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @return array
      *
      * @throws \TypeError
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function getMultiple($keys, $default = null)
     {
@@ -225,6 +245,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
             throw new \TypeError(
                 'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
             );
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
         $list = [];
         foreach ($keys as $key) {
@@ -242,6 +265,8 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @return bool
      *
      * @throws \TypeError
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function setMultiple($values, $ttl = null)
     {
@@ -250,6 +275,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
                 'Arg values type[' . (!is_object($values) ? gettype($values) : get_class($values))
                 . '] is not array|object.'
             );
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
         foreach ($values as $key => $value) {
             if (!$this->set($key, $value, $ttl)) {
@@ -265,6 +293,8 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @return bool
      *
      * @throws \TypeError
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function deleteMultiple($keys)
     {
@@ -272,6 +302,9 @@ class FileCache extends Explorable implements ManagableCacheInterface
             throw new \TypeError(
                 'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
             );
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
         foreach ($keys as $key) {
             // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
@@ -288,11 +321,16 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @return bool
      *
      * @throws CacheInvalidArgumentException
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function has($key)
     {
         if (!CacheKey::validate($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
+        }
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
         return file_exists($this->pathReal . '/stores/' . $this->name . '/' . $key);
     }
@@ -360,15 +398,21 @@ class FileCache extends Explorable implements ManagableCacheInterface
     }
 
 
-    // ManagableCacheInterface.-------------------------------------------------
+    // ManageableCacheInterface.-------------------------------------------------
 
     /**
      * Check if the cache store has any items at all.
      *
      * @return bool
+     *
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function isEmpty() : bool
     {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
         $cache_dir = $this->pathReal . '/stores/' . $this->name;
         $dir_iterator = new \DirectoryIterator($cache_dir);
         foreach ($dir_iterator as $item) {
@@ -390,9 +434,13 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *      Propagated.
      * @throws RuntimeException
      *      Propagated.
+     *      If this store is destroyed.
      */
     public function setTtlDefault($ttl)
     {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
         $time_to_live = $this->timeToLive($ttl);
         // Save to settings .ini file, if different.
         if ($time_to_live != $this->ttlDefault) {
@@ -412,9 +460,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @param bool $ignore
      *
      * @return void
+     *
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function setTtlIgnore(bool $ignore)
     {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
         // Save to settings .ini file, if different.
         if ($ignore != $this->ttlIgnore) {
             $this->ttlIgnore = $ignore;
@@ -431,9 +485,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @return int
      *      Number of items cleared.
+     *
+     * @throws RuntimeException
+     *      If this store is destroyed.
      */
     public function clearExpired() : int
     {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
         $deleted = 0;
         // Unless time-to-live is to be ignored by all methods/procedures.
         if ($this->ttlDefault || !$this->ttlIgnore) {
@@ -452,6 +512,41 @@ class FileCache extends Explorable implements ManagableCacheInterface
             }
         }
         return $deleted;
+    }
+
+    /**
+     * Destroys the whole cache store; it's configuration and all items.
+     *
+     * @see FileCache::clear()
+     *
+     * @return bool
+     *      False on failing to clear().
+     *
+     * @throws RuntimeException
+     *      If this store is already destroyed.
+     * @throws \RuntimeException
+     *      Failure to remove cache dir.
+     *      Failure to delete settings file.
+     */
+    public function destroy()
+    {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is already destroyed, store[' . $this->name . '].');
+        }
+        if (!$this->clear()) {
+            return false;
+        }
+        if (!rmdir($this->pathReal . '/stores/' . $this->name)) {
+            throw new \RuntimeException(
+                'Failed to remove this store\'s cache dir[' . $this->pathReal . '/stores/' . $this->name . '].'
+            );
+        }
+        if (!unlink($this->pathReal . '/' . $this->name . '.ini')) {
+            throw new \RuntimeException(
+                'Failed to delete this store\'s settings file[' . $this->pathReal . '/' . $this->name . '.ini].'
+            );
+        }
+        return true;
     }
 
     // Custom.------------------------------------------------------------------
@@ -594,6 +689,15 @@ class FileCache extends Explorable implements ManagableCacheInterface
      * @var integer
      */
     protected $ttlIgnore = false;
+
+    /**
+     * True upon destroy().
+     *
+     * @see FileCache::destroy()
+     *
+     * @var bool
+     */
+    protected $destroyed = false;
 
     /**
      * Create or load cache store.
@@ -897,8 +1001,6 @@ class FileCache extends Explorable implements ManagableCacheInterface
         return 0;
     }
 
-    // @todo: create cli script that uses getInstances() to clearExpired(); for cron.
-
     /**
      * Finds all stores that has been created using that path,
      * instantiates them, and returns a list of them.
@@ -912,7 +1014,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
      *
      * @return array
      */
-    public static function getInstances($path = '')
+    public static function listInstances($path = '')
     {
         $absolute_path = Utils::getInstance()->resolvePath($path ? $path : static::PATH_DEFAULT);
         if (file_exists($absolute_path)) {
@@ -924,7 +1026,7 @@ class FileCache extends Explorable implements ManagableCacheInterface
             foreach ($dir_iterator as $item) {
                 if (!$item->isDot() && $item->getExtension() == 'ini') {
                     $name = $item->getBasename('.ini');
-                    $instances[] = static::__construct($name);
+                    $instances[] = new static($name);
                 }
             }
             return $instances;

@@ -71,28 +71,30 @@ class CliCache implements CliCommandInterface
                 static::COMMAND_PROVIDER_ALIAS . '-clear-expired',
                 'Delete all expired cache items of one or all cache stores.',
                 [
-                    'store' => 'Cache store name. Optional if option \'all\'.',
+                    'store' => 'Cache store name. Wildcard * for all stores.',
                 ],
-                [
-                    'all' => 'All cache stores.',
-                ],
-                [
-                    'a' => 'all',
-                ]
+                [],
+                []
             ),
             new CliCommand(
                 $this,
                 static::COMMAND_PROVIDER_ALIAS . '-clear-all',
                 'Delete all cache items of one or all cache stores.',
                 [
-                    'store' => 'Cache store name. Optional if option \'all\'.',
+                    'store' => 'Cache store name. Wildcard * for all stores.',
                 ],
+                [],
+                []
+            ),
+            new CliCommand(
+                $this,
+                static::COMMAND_PROVIDER_ALIAS . '-destroy',
+                'Destroy a cache store.',
                 [
-                    'all' => 'All cache stores.',
+                    'store' => 'Cache store name. No wildcard.',
                 ],
-                [
-                    'a' => 'all',
-                ]
+                [],
+                []
             )
         );
     }
@@ -133,24 +135,27 @@ class CliCache implements CliCommandInterface
      */
     public function executeCommand(CliCommand $command)
     {
+        // Dependencies.
+        $cli_env = CliEnvironment::getInstance();
+        // All commands require a (first) store argument.
+        $store = '';
+        if (empty($command->arguments['store'])) {
+            $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'store\' argument.' :
+                'Empty \'store\' argument.';
+        } else {
+            $store = $command->arguments['store'];
+        }
+
         switch ($command->name) {
             case static::COMMAND_PROVIDER_ALIAS . '-clear':
-                $store = $key = '';
+                $key = '';
                 // Validate input. ---------------------------------------------
-                if (empty($command->arguments['store'])) {
-                    $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'store\' argument.' :
-                        'Empty \'store\' argument.';
-                } else {
-                    $store = $command->arguments['store'];
-                }
                 if (empty($command->arguments['key'])) {
                     $command->inputErrors[] = !isset($command->arguments['store']) ? 'Missing \'key\' argument.' :
                         'Empty \'key\' argument.';
                 } else {
                     $key = $command->arguments['key'];
                 }
-                // Dependency.
-                $cli_env = CliEnvironment::getInstance();
                 if ($command->inputErrors) {
                     foreach ($command->inputErrors as $msg) {
                         $cli_env->echoMessage(
@@ -172,21 +177,44 @@ class CliCache implements CliCommandInterface
                     )
                 );
                 // Check if the command is doable.------------------------------
-                $cache_store = CacheBroker::getInstance()->getStore($store);
+                // Does that store exist?
+                $cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
+                if (!method_exists($cache_class, 'listInstances')) {
+                    $cli_env->echoMessage('Cannot retrieve list of store instances via class['
+                        . $cache_class . '], has no static method listInstances().', 'error');
+                    exit;
+                }
+                $stores = forward_static_call($cache_class . '::listInstances');
+                $cache_store = null;
+                foreach ($stores as $instance) {
+                    if ($instance->name == $store) {
+                        /** @var ManageableCacheInterface $cache_store */
+                        $cache_store = $instance;
+                        break;
+                    }
+                }
                 if (!$cache_store) {
-                    $cli_env->echoMessage('Failed to get cache store.', 'error');
+                    $cli_env->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
                     exit;
                 }
-
-
-
-                if (!$command->preConfirmed && !$cli_env->confirm()) {
+                // Request confirmation, unless user used the --yes/-y option.
+                if (
+                    !$command->preConfirmed
+                    && !$cli_env->confirm(
+                        'Are sure you want to delete that cache item? Type \'y\' to continue:',
+                        ['y'],
+                        '',
+                        'Aborted deleting cache item.'
+                    )
+                ) {
                     exit;
                 }
-
-                $cli_env->echoMessage('Now do execute...');
-                echo \SimpleComplex\Inspect\Inspect::getInstance()->inspect($command)->toString(true) . "\n";
-
+                // Do it.
+                if (!$cache_store->delete($key)) {
+                    $cli_env->echoMessage('Failed to delete store[' . $store . '] key[' . $key . '].', 'error');
+                } else {
+                    $cli_env->echoMessage('Deleted store[' . $store . '] key[' . $key . '].', 'success');
+                }
                 exit;
             default:
                 throw new \LogicException(

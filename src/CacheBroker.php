@@ -36,7 +36,7 @@ class CacheBroker extends Explorable
      *
      * @param string $name
      *
-     * @return CacheInterface|ManagableCacheInterface
+     * @return CacheInterface|ManageableCacheInterface
      *
      * @throws OutOfBoundsException
      *      If no such instance property.
@@ -111,6 +111,11 @@ class CacheBroker extends Explorable
     }
 
     /**
+     * @var string
+     */
+    const TYPE_DEFAULT = 'file';
+
+    /**
      * @var string[]
      */
     const CLASS_BY_TYPE = [
@@ -133,7 +138,7 @@ class CacheBroker extends Explorable
      *      Arguments to the store type class' constructor or make().
      *      If empty, this method will provide fitting arguments.
      *
-     * @return \Psr\SimpleCache\CacheInterface|ManagableCacheInterface
+     * @return \Psr\SimpleCache\CacheInterface|ManageableCacheInterface
      */
     public function getStore(string $name, ...$storeConstructorArgs) : CacheInterface
     {
@@ -155,7 +160,7 @@ class CacheBroker extends Explorable
      * @param string $name
      * @param array $storeConstructorArgs
      *
-     * @return \Psr\SimpleCache\CacheInterface|ManagableCacheInterface
+     * @return \Psr\SimpleCache\CacheInterface|ManageableCacheInterface
      */
     protected function instantiateStore(string $name, array $storeConstructorArgs) : CacheInterface
     {
@@ -164,7 +169,7 @@ class CacheBroker extends Explorable
         // Actually not sure if that is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
-        $class = static::CLASS_BY_TYPE['file'];
+        $class = static::CLASS_BY_TYPE[static::TYPE_DEFAULT];
         return new $class(...$storeConstructorArgs);
     }
 
@@ -189,7 +194,7 @@ class CacheBroker extends Explorable
      *      Arg name is empty or contains illegal char(s).
      *
      * @param string $name
-     * @param CacheInterface|ManagableCacheInterface $store
+     * @param CacheInterface|ManageableCacheInterface $store
      *
      * @return bool
      */

@@ -6,7 +6,7 @@ SimpleComplex/Cache 1.x, 2017-06-21
 SimpleComplex/Cache 1.x, 2017-06-18
 -----------------------------------
 - Require 64-bit PHP.
-- Managable cache interface extending PSR-16 Simple Cache, to require methods
+- Manageable cache interface extending PSR-16 Simple Cache, to require methods
   isEmpty, setTtlDefault and setTtlIgnore.
 - FileCache time-to-live algo now differentiates (and combines) none and ignore.
 - FileCache garbage collection grace.
