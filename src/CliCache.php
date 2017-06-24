@@ -242,7 +242,7 @@ class CliCache implements CliCommandInterface
             exit;
         }
         $value = $cache_store->get($key);
-        if (!$print) {
+        if (!$print && !$inspect) {
             return $value;
         }
         $this->environment->echoMessage('');
@@ -513,6 +513,8 @@ class CliCache implements CliCommandInterface
     }
 
     /**
+     * Ignores pre-confirmation --yes/-y option.
+     *
      * @return void
      *      Exits.
      */
@@ -536,7 +538,7 @@ class CliCache implements CliCommandInterface
                 $this->command->inputErrors[] = 'Ambiguous input, saw argument \'store\' plus options \'all\'.';
             }
         }
-        // Pre-confirmation --yes/-y not supported for this command.
+        // Pre-confirmation --yes/-y ignored for this command.
         if ($this->command->preConfirmed) {
             $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command.';
         }
@@ -552,15 +554,13 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        if (!$this->command->preConfirmed) {
-            $this->environment->echoMessage(
-                $this->environment->format(
-                    $this->environment->format($this->command->name, 'emphasize')
-                    . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
-                    'hangingIndent'
-                )
-            );
-        }
+        $this->environment->echoMessage(
+            $this->environment->format(
+                $this->environment->format($this->command->name, 'emphasize')
+                . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
+                'hangingIndent'
+            )
+        );
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
         //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
