@@ -56,13 +56,15 @@ use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Cache\CliCache;
 
 /**
+ * Exposes cache CLI commands.
+ *
  * Only function for IDE to find this script.
  * This file is unknown to Composer autoloader.
  *
  * @code
  * # CLI
  * cd vendor/simplecomplex/cache/src/cli
- * php cache.phpsh cache -h
+ * php cli.phpsh cache -h
  * @endcode
  *
  * @return mixed

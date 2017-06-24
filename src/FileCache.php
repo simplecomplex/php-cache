@@ -182,7 +182,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @code
      * # CLI
      * cd vendor/simplecomplex/cache/src/cli
-     * php cache.phpsh cache -h
+     * php cli.phpsh cache -h
      * @endcode
      *
      * @param string $key

@@ -28,7 +28,7 @@ use SimpleComplex\Utils\CliCommand;
  * @code
  * # CLI
  * cd vendor/simplecomplex/cache/src/cli
- * php cache.phpsh cache -h
+ * php cli.phpsh cache -h
  * @endcode
  *
  * @package SimpleComplex\Cache
@@ -153,7 +153,7 @@ class CliCache implements CliCommandInterface
     {
         $class = '\\SimpleComplex\\Inspect\\Inspect';
         if (class_exists($class)) {
-            return forward_static_call($class . '::getInstance');
+            return new $class();
         }
         return null;
     }
