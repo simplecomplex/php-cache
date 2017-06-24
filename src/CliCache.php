@@ -293,14 +293,16 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        $this->environment->echoMessage(
-            $this->environment->format(
-                $this->environment->format($this->command->name, 'emphasize')
-                . "\n" . 'store: ' . $store
-                . "\n" . 'key: ' . $key,
-                'hangingIndent'
-            )
-        );
+        if (!$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . 'store: ' . $store
+                    . "\n" . 'key: ' . $key,
+                    'hangingIndent'
+                )
+            );
+        }
         // Check if the command is doable.------------------------------
         // Does that store exist?
         //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
@@ -384,13 +386,15 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        $this->environment->echoMessage(
-            $this->environment->format(
-                $this->environment->format($this->command->name, 'emphasize')
-                . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
-                'hangingIndent'
-            )
-        );
+        if (!$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
+                    'hangingIndent'
+                )
+            );
+        }
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
         //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
@@ -548,13 +552,15 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        $this->environment->echoMessage(
-            $this->environment->format(
-                $this->environment->format($this->command->name, 'emphasize')
-                . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
-                'hangingIndent'
-            )
-        );
+        if (!$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
+                    'hangingIndent'
+                )
+            );
+        }
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
         //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
