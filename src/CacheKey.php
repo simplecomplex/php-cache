@@ -48,6 +48,8 @@ class CacheKey
      * - not: {}()/\@:
      * - length: >=2 <=64
      *
+     * First char cannot be hyphen, because that could break CLI interaction.
+     *
      * These keys are selected because they would work in the most basic cache
      * implementation; that is: file (dir names and filenames).
      * Parentheses and colon would have worked too, but forbidden by PSR-16.
@@ -63,6 +65,8 @@ class CacheKey
     /**
      * Checks that length and content is legal.
      *
+     * First char cannot be hyphen, because that could break CLI interaction.
+     *
      * @param string $key
      *
      * @return bool
@@ -71,6 +75,9 @@ class CacheKey
     {
         $le = strlen($key);
         if ($le < static::VALID_LENGTH['min'] || $le > static::VALID_LENGTH['max']) {
+            return false;
+        }
+        if ($key{0} === '-') {
             return false;
         }
         // Faster than a regular expression.

@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-06-24
+-----------------------------------
+- Cache cli complete.
+
 SimpleComplex/Cache 1.x, 2017-06-21
 -----------------------------------
 - Don't use 'iterable' type; effectively useless because stdClass is iterable

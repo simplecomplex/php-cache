@@ -78,7 +78,6 @@ class FileCache extends Explorable implements ManageableCacheInterface
                     // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
                     @unlink($file);
                 }
-
                 return $default;
             }
         }
@@ -179,6 +178,13 @@ class FileCache extends Explorable implements ManageableCacheInterface
     }
 
     /**
+     *
+     * @code
+     * # CLI
+     * cd vendor/simplecomplex/cache/src/cli
+     * php cache.phpsh cache -h
+     * @endcode
+     *
      * @param string $key
      *
      * @return bool
@@ -314,8 +320,6 @@ class FileCache extends Explorable implements ManageableCacheInterface
     }
 
     /**
-     * Does not consider time-to-live, even if this instance has a default ttl.
-     *
      * @param string $key
      *
      * @return bool
@@ -332,7 +336,32 @@ class FileCache extends Explorable implements ManageableCacheInterface
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
         }
-        return file_exists($this->pathReal . '/stores/' . $this->name . '/' . $key);
+
+        $file = $this->pathReal . '/stores/' . $this->name . '/' . $key;
+        if (!file_exists($file)) {
+            return false;
+        }
+
+        // Unless time-to-live is to be ignored by all methods/procedures.
+        if ($this->ttlDefault || !$this->ttlIgnore) {
+            $end_of_life = filemtime($file);
+            if (!$end_of_life) {
+                throw new RuntimeException('Failed to get modified time of file[' . $file . '].');
+            }
+            $time = time();
+            if ($end_of_life < $time) {
+                if (
+                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE)
+                    < $time
+                ) {
+                    // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
+                    @unlink($file);
+                }
+                return false;
+            }
+        }
+
+        return true;
     }
 
 
@@ -536,14 +565,15 @@ class FileCache extends Explorable implements ManageableCacheInterface
         if (!$this->clear()) {
             return false;
         }
-        if (!rmdir($this->pathReal . '/stores/' . $this->name)) {
-            throw new \RuntimeException(
-                'Failed to remove this store\'s cache dir[' . $this->pathReal . '/stores/' . $this->name . '].'
-            );
-        }
         if (!unlink($this->pathReal . '/' . $this->name . '.ini')) {
             throw new \RuntimeException(
                 'Failed to delete this store\'s settings file[' . $this->pathReal . '/' . $this->name . '.ini].'
+            );
+        }
+        $this->destroyed = true;
+        if (!rmdir($this->pathReal . '/stores/' . $this->name)) {
+            throw new \RuntimeException(
+                'Failed to remove this store\'s cache dir[' . $this->pathReal . '/stores/' . $this->name . '].'
             );
         }
         return true;
