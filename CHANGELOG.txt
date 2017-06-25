@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-06-25
+-----------------------------------
+- Inspect class overridable.
+- Renamed cli function to facilitate 'override' in extending packages.
+
 SimpleComplex/Cache 1.x, 2017-06-24
 -----------------------------------
 - Cache cli complete.

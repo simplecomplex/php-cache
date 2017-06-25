@@ -18,7 +18,7 @@ use SimpleComplex\Utils\CliCommand;
  *
  * Expose/execute cache commands.
  *
- * @see cli_cache()
+ * @see simplecomplex_cache_cli()
  *
  * @see FileCache::delete()
  * @see FileCache::clear()
@@ -134,6 +134,11 @@ class CliCache implements CliCommandInterface
     const CLASS_CACHE_BROKER = CacheBroker::class;
 
     /**
+     * @var string
+     */
+    const CLASS_INSPECT = '\\SimpleComplex\\Inspect\\Inspect';
+
+    /**
      * @var CliCommand
      */
     protected $command;
@@ -151,7 +156,7 @@ class CliCache implements CliCommandInterface
      */
     protected function getInspectInstance()
     {
-        $class = '\\SimpleComplex\\Inspect\\Inspect';
+        $class = static::CLASS_INSPECT;
         if (class_exists($class)) {
             return new $class();
         }
