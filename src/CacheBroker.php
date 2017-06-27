@@ -97,6 +97,9 @@ class CacheBroker extends Explorable
     /**
      * First object instantiated via this method, disregarding class called on.
      *
+     * @deprecated Use a dependency injection container instead.
+     * @see \SimpleComplex\Utils\Dependency
+     *
      * @param mixed ...$constructorParams
      *
      * @return CacheBroker
