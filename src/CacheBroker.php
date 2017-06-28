@@ -97,16 +97,17 @@ class CacheBroker extends Explorable
     /**
      * First object instantiated via this method, disregarding class called on.
      *
-     * @param mixed ...$constructorParams
+     * @deprecated Use a dependency injection container instead.
+     * @see \SimpleComplex\Utils\Dependency
      *
      * @return CacheBroker
      *      static, really, but IDE might not resolve that.
      */
-    public static function getInstance(...$constructorParams)
+    public static function getInstance()
     {
         // Unsure about null ternary ?? for class and instance vars.
         if (!static::$instance) {
-            static::$instance = new static(...$constructorParams);
+            static::$instance = new static();
         }
         return static::$instance;
     }
