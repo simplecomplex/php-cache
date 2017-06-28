@@ -102,6 +102,7 @@ class CacheBroker extends Explorable
      *
      * @deprecated Use a dependency injection container instead.
      * @see \SimpleComplex\Utils\Dependency
+     * @see \Slim\Container
      *
      * @return CacheBroker
      *      static, really, but IDE might not resolve that.
