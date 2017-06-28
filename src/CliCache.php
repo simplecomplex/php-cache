@@ -12,6 +12,7 @@ namespace SimpleComplex\Cache;
 use SimpleComplex\Utils\CliCommandInterface;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\CliCommand;
+use SimpleComplex\Utils\Dependency;
 
 /**
  * CLI only.
@@ -149,26 +150,12 @@ class CliCache implements CliCommandInterface
     protected $environment;
 
     /**
-     * To use class extending Inspect, call [ExtendedInspect]::getInstance()
-     * before instantiating this class.
-     *
-     * @return \SimpleComplex\Inspect\Inspect|null
-     */
-    protected function getInspectInstance()
-    {
-        $class = static::CLASS_INSPECT;
-        if (class_exists($class)) {
-            return new $class();
-        }
-        return null;
-    }
-
-    /**
      * @return mixed
      *      Exits if option 'print'.
      */
     protected function cmdGet()
     {
+        $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
         if (empty($this->command->arguments['store'])) {
@@ -219,8 +206,12 @@ class CliCache implements CliCommandInterface
         }
         // Check if the command is doable.------------------------------
         // Does that store exist?
-        //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
-        $cache_broker_class = static::CLASS_CACHE_BROKER;
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
         $cache_class =
             constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
         if (!method_exists($cache_class, 'listInstances')) {
@@ -251,11 +242,20 @@ class CliCache implements CliCommandInterface
             return $value;
         }
         $this->environment->echoMessage('');
-        if ($inspect && ($inspect = $this->getInspectInstance())) {
-            $this->environment->echoMessage($inspect->inspect($value)->toString(true));
-        } else {
-            $this->environment->echoMessage(json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        if ($inspect) {
+            $inspector = null;
+            if ($container->has('inspector')) {
+                $inspector = $container->get('inspector');
+            } elseif (class_exists(static::CLASS_INSPECT)) {
+                $class_inspect = static::CLASS_INSPECT;
+                $inspector = new $class_inspect($container->has('config') ? $container->get('config') : null);
+            }
+            if ($inspector) {
+                $this->environment->echoMessage($inspector->inspect($value)->toString(true));
+                exit;
+            }
         }
+        $this->environment->echoMessage(json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
         exit;
     }
 
@@ -265,6 +265,7 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdDelete() /*: void*/
     {
+        $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
         if (empty($this->command->arguments['store'])) {
@@ -310,8 +311,12 @@ class CliCache implements CliCommandInterface
         }
         // Check if the command is doable.------------------------------
         // Does that store exist?
-        //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
-        $cache_broker_class = static::CLASS_CACHE_BROKER;
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
         $cache_class =
             constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
         if (!method_exists($cache_class, 'listInstances')) {
@@ -361,6 +366,7 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdClear($expired = false) /*: void*/
     {
+        $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
         $all_stores = !empty($this->command->options['all']);
@@ -402,8 +408,12 @@ class CliCache implements CliCommandInterface
         }
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
-        //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
-        $cache_broker_class = static::CLASS_CACHE_BROKER;
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
         $cache_class =
             constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
         if (!method_exists($cache_class, 'listInstances')) {
@@ -525,6 +535,7 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdDestroy() /*: void*/
     {
+        $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
         $all_stores = !empty($this->command->options['all']);
@@ -568,8 +579,12 @@ class CliCache implements CliCommandInterface
         );
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
-        //$cache_class = CacheBroker::CLASS_BY_TYPE[CacheBroker::TYPE_DEFAULT];
-        $cache_broker_class = static::CLASS_CACHE_BROKER;
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
         $cache_class =
             constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
         if (!method_exists($cache_class, 'listInstances')) {
