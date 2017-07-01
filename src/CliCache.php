@@ -155,6 +155,9 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdGet()
     {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
         $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
@@ -229,11 +232,13 @@ class CliCache implements CliCommandInterface
             }
         }
         if (!$cache_store) {
+            $this->environment->echoMessage('');
             $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
             exit;
         }
         // Do it.
         if (!$cache_store->has($key)) {
+            $this->environment->echoMessage('');
             $this->environment->echoMessage('Cache store[' . $store . '] key[' . $key . '] doesn\'t exist.', 'notice');
             exit;
         }
@@ -265,6 +270,9 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdDelete() /*: void*/
     {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
         $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
@@ -366,6 +374,9 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdClear($expired = false) /*: void*/
     {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
         $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
@@ -535,6 +546,9 @@ class CliCache implements CliCommandInterface
      */
     protected function cmdDestroy() /*: void*/
     {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
         $container = Dependency::container();
         // Validate input. ---------------------------------------------
         $store = '';
