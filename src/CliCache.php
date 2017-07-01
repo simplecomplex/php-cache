@@ -260,7 +260,9 @@ class CliCache implements CliCommandInterface
                 exit;
             }
         }
-        $this->environment->echoMessage(json_encode($value, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+        $this->environment->echoMessage(
+            json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)
+        );
         exit;
     }
 
