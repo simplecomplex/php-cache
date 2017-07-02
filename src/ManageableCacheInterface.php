@@ -100,6 +100,13 @@ interface ManageableCacheInterface extends CacheInterface
     public function destroy();
 
     /**
+     * Reads all non-expired and non-null cache items into a keyed array.
+     *
+     * @return array
+     */
+    public function export();
+
+    /**
      * Finds all stores created via this class (or at least all instances
      * related to some configuration),
      * instantiates them, and returns a list of them.

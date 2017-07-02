@@ -47,6 +47,10 @@ interface BackupCacheInterface extends CacheInterface
      * Make setters write to a 'candidate' physical store instead of the normal
      * store.
      *
+     * Facilitates safe mode cache building. Build a new cache, but don't use
+     * it until all items (delivered by a third party, like configuration)
+     * have been set.
+     *
      * @return void
      *
      * @throws \Throwable
@@ -56,6 +60,10 @@ interface BackupCacheInterface extends CacheInterface
 
     /**
      * Backup normal physical store, and replace it with a candidate store.
+     *
+     * Facilitates safe mode cache building. Build a new cache, but don't use
+     * it until all items (delivered by a third party, like configuration)
+     * have been set.
      *
      * @param string $backupName
      *

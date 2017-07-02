@@ -578,6 +578,28 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     }
 
     /**
+     * Reads all non-expired and non-null cache items into a keyed array.
+     *
+     * @return array
+     */
+    public function export() : array
+    {
+        $collection = [];
+        $store = $this->pathReal . '/stores/' . $this->name;
+        $dir_iterator = new \DirectoryIterator($store);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                $key = $item->getFilename();
+                $value = $this->get($key);
+                if ($value !== null) {
+                    $collection[$key] = $value;
+                }
+            }
+        }
+        return $collection;
+    }
+
+    /**
      * Backup the whole cache store.
      *
      * @param string $backupName
@@ -703,6 +725,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      * Make setters write to a 'candidate' physical store instead of the normal
      * store.
      *
+     * Facilitates safe mode cache building. Build a new cache, but don't use
+     * it until all items (delivered by a third party, like configuration)
+     * have been set.
+     *
      * @return void
      *
      * @throws \Throwable
@@ -724,6 +750,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
 
     /**
      * Backup normal physical store, and replace it with a candidate store.
+     *
+     * Facilitates safe mode cache building. Build a new cache, but don't use
+     * it until all items (delivered by a third party, like configuration)
+     * have been set.
      *
      * @param string $backupName
      *
