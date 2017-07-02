@@ -31,7 +31,7 @@ use SimpleComplex\Cache\Exception\RuntimeException;
  *
  * @package SimpleComplex\Cache
  */
-class FileCache extends Explorable implements ManageableCacheInterface
+class FileCache extends Explorable implements ManageableCacheInterface, BackupCacheInterface
 {
     // \Psr\SimpleCache\CacheInterface members.---------------------------------
 
@@ -47,7 +47,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *      If this store's ttlDefault isn't zero, and checking file's modified
      *      time fails.
      *      If failing to read file.
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function get($key, $default = null)
     {
@@ -115,7 +115,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *      Failing to serialize.
      *      Failing to write to file.
      *      Failing to set modified time of file.
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function set($key, $value, $ttl = null)
     {
@@ -131,7 +131,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
             throw new RuntimeException('Failed to serialize value.');
         }
 
-        $file = $this->pathReal . '/stores/' . $this->name . '/' . $key;
+        $file = $this->pathReal . (!$this->isCandidate ? '/stores/' : '/candidates/') . $this->name . '/' . $key;
         // Uses rename() because that's atomic in *nix systems.
         // @ is PSR-16 illegal in key, so usable as mock directory separator.
         if (!($tmp_file = tempnam($this->pathReal . '/tmp', $this->name . '@' . $key))) {
@@ -150,9 +150,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
             throw new RuntimeException('Failed to rename temp to final cache file.');
         }
         // tempnam() writes using file mode 0600, and rename doesn't alter mode.
-        if (($this->fileMode != 'user' || static::FILE_MODE['file_user'] != 0600)
-            && !chmod($file, static::FILE_MODE['file_' . $this->fileMode])
-        ) {
+        if (($this->fileMode != 'user') && !chmod($file, static::FILE_MODE['file_' . $this->fileMode])) {
             throw new RuntimeException('Failed to chmod cache file[' . $file . '].');
         }
 
@@ -170,7 +168,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
                 $time_to_live
                 && !touch($file, time() + $time_to_live)
             ) {
-                throw new RuntimeException('Failed to set future modified time of[' . $file . '].');
+                throw new RuntimeException('Failed to set future modified time of file[' . $file . '].');
             }
         }
 
@@ -193,7 +191,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @throws CacheInvalidArgumentException
      *      Arg key invalid.
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function delete($key)
     {
@@ -218,7 +216,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @throws \RuntimeException
      *      On other failures.
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function clear()
     {
@@ -243,7 +241,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *
      * @throws \TypeError
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function getMultiple($keys, $default = null)
     {
@@ -272,7 +270,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *
      * @throws \TypeError
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function setMultiple($values, $ttl = null)
     {
@@ -300,7 +298,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *
      * @throws \TypeError
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function deleteMultiple($keys)
     {
@@ -326,7 +324,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *
      * @throws CacheInvalidArgumentException
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function has($key)
     {
@@ -435,7 +433,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @return bool
      *
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function isEmpty() : bool
     {
@@ -463,7 +461,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *      Propagated.
      * @throws RuntimeException
      *      Propagated.
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function setTtlDefault($ttl)
     {
@@ -491,7 +489,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @return void
      *
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function setTtlIgnore(bool $ignore)
     {
@@ -516,7 +514,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      *      Number of items cleared.
      *
      * @throws RuntimeException
-     *      If this store is destroyed.
+     *      This store is destroyed.
      */
     public function clearExpired() : int
     {
@@ -579,6 +577,228 @@ class FileCache extends Explorable implements ManageableCacheInterface
         return true;
     }
 
+    /**
+     * Backup the whole cache store.
+     *
+     * @param string $backupName
+     *
+     * @return int
+     *      Number of files copied.
+     *
+     * @throws RuntimeException
+     * @throws \Throwable
+     *      Propagated.
+     */
+    public function backup(string $backupName)
+    {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
+
+        $utils = Utils::getInstance();
+
+        // Ensure that stores dir exists.
+        // Paranoid (constructor checks), but anyway.
+        $dir_original = $this->pathReal . '/stores/' . $this->name;
+        if (!file_exists($dir_original)) {
+            throw new RuntimeException('This cache store\'s store dir doesn\'t exist, store[' . $this->name . '].');
+        }
+
+        // Ensure backup dir.
+        $dir_backup = $this->pathReal . '/backup/' . $this->name;
+        if (file_exists($dir_backup . '/' . $backupName)) {
+            throw new RuntimeException(
+                'That backup already exists, store[' . $this->name . '], arg backupName[' . $backupName . '].'
+            );
+        }
+        $dir_backup .= '/' . $backupName;
+        $utils->ensurePath($dir_backup, static::FILE_MODE['dir_' . $this->fileMode]);
+
+        $file_group_write = $this->fileMode != 'user';
+        $file_mode = static::FILE_MODE['file_' . $this->fileMode];
+
+        // Unless time-to-live is to be ignored by all methods/procedures.
+        $clone_modified = $this->ttlDefault || !$this->ttlIgnore;
+
+        $n_items = $modified = 0;
+        $dir_iterator = new \DirectoryIterator($dir_original);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                $filename = $item->getFilename();
+                if ($clone_modified) {
+                    $modified = $item->getMTime();
+                }
+                $file_backup = $dir_backup . '/' . $filename;
+                if (!@copy($dir_original . '/' . $filename, $file_backup)) {
+                    throw new RuntimeException(
+                        'Failed to copy original[' . $dir_original . '/' . $filename
+                        . '] to backup[' . $file_backup . '].'
+                    );
+                }
+                if ($file_group_write && !@chmod($file_backup, $file_mode)) {
+                    throw new RuntimeException('Failed to chmod backup file[' . $file_backup . '].');
+                }
+                if ($clone_modified && !@touch($file_backup, $modified)) {
+                    throw new RuntimeException('Failed to set modified time of backup file[' . $file_backup . '].');
+                }
+                ++$n_items;
+            }
+        }
+
+        return $n_items;
+    }
+
+    /**
+     * Restore the whole cache store from a backup.
+     *
+     * @param string $backupName
+     *
+     * @return bool
+     */
+    public function restore(string $backupName)
+    {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
+
+        $utils = Utils::getInstance();
+
+        // Ensure that stores dir exists.
+        // Paranoid (constructor checks), but anyway.
+        $dir_original = $this->pathReal . '/stores/' . $this->name;
+        if (!file_exists($dir_original)) {
+            throw new RuntimeException('This cache store\'s store dir doesn\'t exist, store[' . $this->name . '].');
+        }
+
+        // Ensure backup dir.
+        $dir_backup = $this->pathReal . '/backup/' . $this->name . '/' . $backupName;
+        if (!file_exists($dir_backup)) {
+            throw new RuntimeException(
+                'That backup doesn\'t exist, store[' . $this->name . '], arg backupName[' . $backupName . '].'
+            );
+        }
+
+        // Clear current.
+        if (!$this->clear()) {
+            throw new RuntimeException('Failed to clear store[' . $this->name . '].');
+        }
+        if (!@rmdir($dir_original)) {
+            throw new RuntimeException('Failed to remove store dir, store[' . $this->name . '].');
+        }
+
+        $filemode_dir = static::FILE_MODE['dir_' . $this->fileMode];
+        $dir_group_write = $utils->isFileGroupWrite($filemode_dir);
+
+        if (!@rename($dir_backup, $dir_original)) {
+            throw new RuntimeException('Failed to move backup to store, store[' . $this->name . '].');
+        }
+        if ($dir_group_write && !@chmod($dir_original, $filemode_dir)) {
+            throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
+        }
+
+        return true;
+    }
+
+    /**
+     * Make setters write to a 'candidate' physical store instead of the normal
+     * store.
+     *
+     * @return void
+     *
+     * @throws \Throwable
+     *      Propagated.
+     */
+    public function setCandidate() /*: void*/
+    {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
+        $utils = Utils::getInstance();
+        // Ensure candidates dir.
+        $dir = $this->pathReal . '/candidates/' . $this->name;
+        if (!file_exists($dir)) {
+            $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
+        }
+        $this->isCandidate = true;
+    }
+
+    /**
+     * Backup normal physical store, and replace it with a candidate store.
+     *
+     * @param string $backupName
+     *
+     * @return bool
+     *      False: Candidate for this store doesn't exist.
+     *
+     * @throws RuntimeException
+     * @throws \Throwable
+     *      Propagated.
+     */
+    public function promoteCandidate(string $backupName) : bool
+    {
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
+        $utils = Utils::getInstance();
+
+        $filemode_dir = static::FILE_MODE['dir_' . $this->fileMode];
+        $dir_group_write = $utils->isFileGroupWrite($filemode_dir);
+
+        // Ensure that stores dir exists.
+        // Paranoid (constructor checks), but anyway.
+        $dir_original = $this->pathReal . '/stores/' . $this->name;
+        if (!file_exists($dir_original)) {
+            throw new RuntimeException('This cache store\'s store dir doesn\'t exist, store[' . $this->name . '].');
+        }
+
+        // Ensure backup dir.
+        $dir_backup = $this->pathReal . '/backup/' . $this->name;
+        if (file_exists($dir_backup . '/' . $backupName)) {
+            throw new RuntimeException(
+                'That backup already exists, store[' . $this->name . '], arg backupName[' . $backupName . '].'
+            );
+        }
+        $utils->ensurePath($dir_backup, $filemode_dir);
+        $dir_backup .= '/' . $backupName;
+
+        // Check that the candidate exists.
+        $dir_candidate = $this->pathReal . '/candidates/' . $this->name;
+        if (!file_exists($dir_candidate)) {
+            return false;
+        }
+
+        // Check that candidate isn't empty.
+        $non_empty = false;
+        $dir_iterator = new \DirectoryIterator($dir_candidate);
+        foreach ($dir_iterator as $item) {
+            if (!$item->isDot()) {
+                $non_empty = true;
+                break;
+            }
+        }
+        if (!$non_empty) {
+            throw new RuntimeException('This cache store\'s candidate is empty, store[' . $this->name . '].');
+        }
+
+        // Move current to backup.
+        if (!@rename($dir_original, $dir_backup)) {
+            throw new RuntimeException('Failed to move store to backup, store[' . $this->name . '].');
+        }
+        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+            throw new RuntimeException('Failed to chmod backup dir, store[' . $this->name . '].');
+        }
+
+        // Move candidate to current.
+        if (!@rename($dir_candidate, $dir_original)) {
+            throw new RuntimeException('Failed to move candidate to current, store[' . $this->name . '].');
+        }
+        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+            throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
+        }
+
+        return true;
+    }
+
     // Custom.------------------------------------------------------------------
 
     /**
@@ -599,7 +819,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * File modes for directory/file writing, using respectively user-only,
      * group read/write/execute and group plus set group id.
      *
-     * Must be octals integers, with leading zero, nothing else seem to work;
+     * Must be octal integers, with leading zero, nothing else seem to work;
      * even if decoct/octdec() juggling.
      *
      * @var int[]
@@ -728,6 +948,13 @@ class FileCache extends Explorable implements ManageableCacheInterface
      * @var bool
      */
     protected $destroyed = false;
+
+    /**
+     * Write to candidate storage instead of the normal.
+     *
+     * @var bool
+     */
+    protected $isCandidate = false;
 
     /**
      * Create or load cache store.
@@ -902,7 +1129,7 @@ class FileCache extends Explorable implements ManageableCacheInterface
     }
 
     /**
-     * Ensures this class' (writable) path, tmp dir and stores dir.
+     * Ensures this class' (writable) path, tmp, backup and stores dir.
      *
      * @see FileCache::__construct()
      * @see FileCache::resolvePath()
@@ -917,14 +1144,14 @@ class FileCache extends Explorable implements ManageableCacheInterface
     {
         $utils = Utils::getInstance();
         // Ensure cache dir.
-        $cache_dir = $this->pathReal . '/stores/' . $this->name;
-        if (!file_exists($cache_dir)) {
-            $utils->ensurePath($cache_dir, static::FILE_MODE['dir_' . $this->fileMode]);
+        $dir = $this->pathReal . '/stores/' . $this->name;
+        if (!file_exists($dir)) {
+            $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
-        // Ensure tmp dir.
-        $tmp_dir = $this->pathReal . '/tmp';
-        if (!file_exists($tmp_dir)) {
-            $utils->ensurePath($tmp_dir, static::FILE_MODE['dir_' . $this->fileMode]);
+        // Ensure general tmp dir.
+        $dir = $this->pathReal . '/tmp';
+        if (!file_exists($dir)) {
+            $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
     }
 

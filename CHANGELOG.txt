@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-07-02
+-----------------------------------
+- New BackupCacheInterface, and FileCache implementing it.
+- New CLI commands backup and restore.
+
 SimpleComplex/Cache 1.x, 2017-06-25
 -----------------------------------
 - Inspect class overridable.

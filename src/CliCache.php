@@ -114,8 +114,31 @@ class CliCache implements CliCommandInterface
             ),
             new CliCommand(
                 $this,
+                static::COMMAND_PROVIDER_ALIAS . '-backup',
+                'Backup a cache store.',
+                [
+                    'store' => 'Cache store name.',
+                    'backup' =>
+                        'Without store name, perhaps a timestamp. Optional, defaults to YYYY-MM-DD_HHiiss.',
+                ],
+                [],
+                []
+            ),
+            new CliCommand(
+                $this,
+                static::COMMAND_PROVIDER_ALIAS . '-restore',
+                'Restore a cache store from backup.' . "\n" . 'Ignores --yes/-y pre-confirmation option.',
+                [
+                    'store' => 'Cache store name.',
+                    'backup' => 'Name of the backup, without store name. Perhaps a timestamp.',
+                ],
+                [],
+                []
+            ),
+            new CliCommand(
+                $this,
                 static::COMMAND_PROVIDER_ALIAS . '-destroy',
-                'Destroy one or all cache stores.',
+                'Destroy one or all cache stores.' . "\n" . 'Ignores --yes/-y pre-confirmation option.',
                 [
                     'store' => 'Cache store name. Skip if --all.',
                 ],
@@ -541,6 +564,233 @@ class CliCache implements CliCommandInterface
     }
 
     /**
+     * @return void
+     *      Exits.
+     */
+    protected function cmdBackup()
+    {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
+        $container = Dependency::container();
+        // Validate input. ---------------------------------------------
+        $store = '';
+        if (empty($this->command->arguments['store'])) {
+            $this->command->inputErrors[] = !isset($this->command->arguments['store']) ? 'Missing \'store\' argument.' :
+                'Empty \'store\' argument.';
+        } else {
+            $store = $this->command->arguments['store'];
+            if (!CacheKey::validate($store)) {
+                $this->command->inputErrors[] = 'Invalid \'store\' argument.';
+            }
+        }
+        if (!empty($this->command->arguments['backup'])) {
+            $backup = $this->command->arguments['backup'];
+            if (strpos($backup, '/') !== false || (DIRECTORY_SEPARATOR == '\\' && strpos($backup, '\\') !== false)) {
+                $this->command->inputErrors[] = 'The \'backup\' argument must be a name, not a path.';
+            }
+        } else {
+            $backup = date('Y-m-d_His');
+        }
+        if ($this->command->inputErrors) {
+            foreach ($this->command->inputErrors as $msg) {
+                $this->environment->echoMessage(
+                    $this->environment->format($msg, 'hangingIndent'),
+                    'notice'
+                );
+            }
+            // This command's help text.
+            $this->environment->echoMessage("\n" . $this->command);
+            exit;
+        }
+        // Display command and the arg values used.---------------------
+        if (!$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . 'store: ' . $store
+                    . "\n" . 'backup: ' . $backup
+                    . (!$this->command->options ? '' : ("\n--" . join(' --', array_keys($this->command->options)))),
+                    'hangingIndent'
+                )
+            );
+        }
+        // Check if the command is doable.------------------------------
+        // Does that store exist?
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
+        $cache_class =
+            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        if (!method_exists($cache_class, 'listInstances')) {
+            $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
+                . $cache_class . '], has no static method listInstances().', 'error');
+            exit;
+        }
+        $stores = forward_static_call($cache_class . '::listInstances');
+        $cache_store = null;
+        foreach ($stores as $instance) {
+            if ($instance->name == $store) {
+                /** @var BackupCacheInterface $cache_store */
+                $cache_store = $instance;
+                break;
+            }
+        }
+        if (!$cache_store) {
+            $this->environment->echoMessage('');
+            $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
+            exit;
+        }
+        // Request confirmation, unless user used the --yes/-y option.
+        if (
+            !$this->command->preConfirmed
+            && !$this->environment->confirm(
+                'Backup cache store?  Type \'yes\' or \'y\' to continue:',
+                    ['yes', 'y'],
+                '',
+                'Aborted backing up cache store.'
+            )
+        ) {
+            exit;
+        }
+        // Do it.
+        $success = $cache_store->backup($backup);
+        if ($success === false) {
+            $this->environment->echoMessage('Failed to backup store[' . $store . '].', 'error');
+        } else {
+            if (is_int($success)) {
+                $this->environment->echoMessage(
+                    'Backed up store[' . $store . '] to backup[' . $backup . '], copying ' . $success . ' items.',
+                    'success'
+                );
+            } else {
+                $this->environment->echoMessage(
+                    'Backed up store[' . $store . '] to backup[' . $backup . '].',
+                    'success'
+                );
+            }
+        }
+        exit;
+    }
+
+    /**
+     * Ignores pre-confirmation --yes/-y option.
+     *
+     * @return void
+     *      Exits.
+     */
+    protected function cmdRestore()
+    {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
+        $container = Dependency::container();
+        // Validate input. ---------------------------------------------
+        $store = '';
+        if (empty($this->command->arguments['store'])) {
+            $this->command->inputErrors[] = !isset($this->command->arguments['store']) ? 'Missing \'store\' argument.' :
+                'Empty \'store\' argument.';
+        } else {
+            $store = $this->command->arguments['store'];
+            if (!CacheKey::validate($store)) {
+                $this->command->inputErrors[] = 'Invalid \'store\' argument.';
+            }
+        }
+        $backup = '';
+        if (empty($this->command->arguments['backup'])) {
+            $this->command->inputErrors[] = !isset($this->command->arguments['store']) ?
+                'Missing \'backup\' argument.' : 'Empty \'backup\' argument.';
+        } else {
+            $backup = $this->command->arguments['backup'];
+            if (strpos($backup, '/') !== false || (DIRECTORY_SEPARATOR == '\\' && strpos($backup, '\\') !== false)) {
+                $this->command->inputErrors[] = 'The \'backup\' argument must be a name, not a path.';
+            }
+        }
+        if ($this->command->inputErrors) {
+            foreach ($this->command->inputErrors as $msg) {
+                $this->environment->echoMessage(
+                    $this->environment->format($msg, 'hangingIndent'),
+                    'notice'
+                );
+            }
+            // This command's help text.
+            $this->environment->echoMessage("\n" . $this->command);
+            exit;
+        }
+        // Display command and the arg values used.---------------------
+        $this->environment->echoMessage(
+            $this->environment->format(
+                $this->environment->format($this->command->name, 'emphasize')
+                . "\n" . 'store: ' . $store
+                . "\n" . 'backup: ' . $backup
+                . (!$this->command->options ? '' : ("\n--" . join(' --', array_keys($this->command->options)))),
+                'hangingIndent'
+            )
+        );
+        // Check if the command is doable.------------------------------
+        // Does that store exist?
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
+        $cache_class =
+            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        if (!method_exists($cache_class, 'listInstances')) {
+            $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
+                . $cache_class . '], has no static method listInstances().', 'error');
+            exit;
+        }
+        $stores = forward_static_call($cache_class . '::listInstances');
+        $cache_store = null;
+        foreach ($stores as $instance) {
+            if ($instance->name == $store) {
+                /** @var BackupCacheInterface $cache_store */
+                $cache_store = $instance;
+                break;
+            }
+        }
+        if (!$cache_store) {
+            $this->environment->echoMessage('');
+            $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
+            exit;
+        }
+        // Request confirmation, ignore --yes/-y pre-confirmation option.
+        if (
+            !$this->environment->confirm(
+                'Restore cache store from backup? Type \'yes\' to continue:',
+                ['yes'],
+                '',
+                'Aborted restoring cache store from backup.'
+            )
+        ) {
+            exit;
+        }
+        // Do it.
+        $success = $cache_store->restore($backup);
+        if ($success === false) {
+            $this->environment->echoMessage('Failed to restore store[' . $store . '] from backup.', 'error');
+        } else {
+            if (is_int($success)) {
+                $this->environment->echoMessage(
+                    'Restored store[' . $store . '] from backup[' . $backup . '], copying ' . $success . ' items.',
+                    'success'
+                );
+            } else {
+                $this->environment->echoMessage(
+                    'Restored store[' . $store . '] from backup[' . $backup . '].',
+                    'success'
+                );
+            }
+        }
+        exit;
+    }
+
+    /**
      * Ignores pre-confirmation --yes/-y option.
      *
      * @return void
@@ -716,6 +966,12 @@ class CliCache implements CliCommandInterface
                 exit;
             case static::COMMAND_PROVIDER_ALIAS . '-clear':
                 $this->cmdClear();
+                exit;
+            case static::COMMAND_PROVIDER_ALIAS . '-backup':
+                $this->cmdBackup();
+                exit;
+            case static::COMMAND_PROVIDER_ALIAS . '-restore':
+                $this->cmdRestore();
                 exit;
             case static::COMMAND_PROVIDER_ALIAS . '-destroy':
                 $this->cmdDestroy();

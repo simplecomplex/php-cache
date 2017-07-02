@@ -12,7 +12,7 @@ namespace SimpleComplex\Cache;
 use Psr\SimpleCache\CacheInterface;
 
 /**
- * Extension of PSR-16 Simple Cache interface.
+ * Extension of PSR-16 Simple Cache interface, requiring cache managing methods.
  *
  * @see \Psr\SimpleCache\CacheInterface
  *
@@ -27,6 +27,9 @@ interface ManageableCacheInterface extends CacheInterface
      * container method.
      *
      * @return bool
+     *
+     * @throws \Throwable
+     *      On error.
      */
     public function isEmpty() : bool;
 
@@ -61,6 +64,9 @@ interface ManageableCacheInterface extends CacheInterface
      * @param bool $ignore
      *
      * @return void
+     *
+     * @throws \Throwable
+     *      On error.
      */
     public function setTtlIgnore(bool $ignore);
 
@@ -73,6 +79,9 @@ interface ManageableCacheInterface extends CacheInterface
      * @return int|bool
      *      Int: number of items cleared.
      *      Bool: success/failure.
+     *
+     * @throws \Throwable
+     *      On error.
      */
     public function clearExpired();
 
@@ -84,6 +93,9 @@ interface ManageableCacheInterface extends CacheInterface
      * @see CacheInterface::clear()
      *
      * @return bool
+     *
+     * @throws \Throwable
+     *      On error.
      */
     public function destroy();
 
