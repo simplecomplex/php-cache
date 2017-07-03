@@ -3,6 +3,10 @@ SimpleComplex/Cache 1.x, 2017-07-03
 - New ManageableCacheInterface required method isNew().
 - Fast lanes for new/regeneration FileCache store instantiation, when no options
   passed to the constructor.
+- Use FileCache extending classes to define default ttl and ignore ttl,
+  instead of constructor arg options.
+- CacheBroker constructor now accept concrete cache class name as well as class
+  aliases for base, default, variable_ttl, fixed_ttl and persistent.
 
 SimpleComplex/Cache 1.x, 2017-07-02
 -----------------------------------

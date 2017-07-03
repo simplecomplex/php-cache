@@ -117,16 +117,47 @@ class CacheBroker extends Explorable
     }
 
     /**
-     * @var string
-     */
-    const TYPE_DEFAULT = 'file';
-
-    /**
+     * Cache classes.
+     *
+     * Extended CacheBroker class could override this list.
+     *
      * @var string[]
      */
-    const CLASS_BY_TYPE = [
-        'file' => FileCache::class,
+    const CACHE_CLASSES = [
+        'base' => FileCache::class,
+        'default' => FileCache::class,
+        'variable_ttl' => FileCache::class,
+        'fixed_ttl' => FixedTtlFileCache::class,
+        'persistent' => PersistentFileCache::class,
     ];
+
+    /**
+     * Base cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_BASE = 'base';
+
+    /**
+     * Variable time-to-live cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_VARIABLE_TTL = 'variable_ttl';
+
+    /**
+     * Fixed time-to-live cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_FIXED_TTL = 'fixed_ttl';
+
+    /**
+     * Persistent cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_PERSISTENT = 'persistent';
 
     /**
      * @var array
@@ -136,17 +167,22 @@ class CacheBroker extends Explorable
     /**
      * Get or create cache store.
      *
-     * @throws InvalidArgumentException
-     *      Arg name is empty or contains illegal char(s).
-     *
      * @param string $name
+     * @param string $classNameArAlias
+     *      Use alias CACHE_VARIABLE_TTL|CACHE_FIXED_TTL|CACHE_PERSISTENT
+     *      (recommended, allows search for usage) or a concrete class name.
+     *      Empty or 'default' resolves to CACHE_CLASSES[default]
      * @param mixed ...$storeConstructorArgs
      *      Arguments to the store type class' constructor or make().
      *      If empty, this method will provide fitting arguments.
      *
      * @return \Psr\SimpleCache\CacheInterface|ManageableCacheInterface
+     *
+     * @throws InvalidArgumentException
+     *      Arg name is empty or contains illegal char(s).
+     *      Propagated; see instantiateStore().
      */
-    public function getStore(string $name, ...$storeConstructorArgs) : CacheInterface
+    public function getStore(string $name, string $classNameArAlias, ...$storeConstructorArgs) : CacheInterface
     {
         if (!CacheKey::validate($name)) {
             throw new InvalidArgumentException('Arg name is not valid, name[' . $name . '].');
@@ -154,7 +190,7 @@ class CacheBroker extends Explorable
         if (isset($this->stores[$name])) {
             return $this->stores[$name];
         }
-        $this->stores[$name] = $store = $this->instantiateStore($name, $storeConstructorArgs);
+        $this->stores[$name] = $store = $this->instantiateStore($name, $classNameArAlias, $storeConstructorArgs);
         $this->explorableIndex[] = $name;
         return $store;
     }
@@ -164,18 +200,39 @@ class CacheBroker extends Explorable
      * a CacheInterface implementation.
      *
      * @param string $name
+     * @param string $classNameArAlias
      * @param array $storeConstructorArgs
      *
      * @return \Psr\SimpleCache\CacheInterface|ManageableCacheInterface
+     *
+     * @throws InvalidArgumentException
+     *      Arg classNameArAlias seem to be a class name (not an alias),
+     *      and that class doesn't exist or it doesn't implement CacheInterface.
      */
-    protected function instantiateStore(string $name, array $storeConstructorArgs) : CacheInterface
+    protected function instantiateStore(string $name, string $classNameArAlias, array $storeConstructorArgs) : CacheInterface
     {
         // NB: First cache implementation's constructor param must be $name,
         // and this $storeConstructorArgs must not contain that argument.
         // Actually not sure if that is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
-        $class = static::CLASS_BY_TYPE[static::TYPE_DEFAULT];
+        if (!$classNameArAlias) {
+            $class = static::CACHE_CLASSES['default'];
+        } elseif (isset(static::CACHE_CLASSES[$classNameArAlias])) {
+            $class = static::CACHE_CLASSES[$classNameArAlias];
+        } else {
+            if (!class_exists($classNameArAlias)) {
+                throw new InvalidArgumentException(
+                    'Class doesn\'t exist, arg classNameArAlias[' . $classNameArAlias . '].'
+                );
+            }
+            if (!is_subclass_of($classNameArAlias, CacheInterface::class)) {
+                throw new InvalidArgumentException(
+                    'Class doesn\'t implement PSR-16 CacheInterface, arg classNameArAlias[' . $classNameArAlias . '].'
+                );
+            }
+            $class = $classNameArAlias;
+        }
         return new $class(...$storeConstructorArgs);
     }
 

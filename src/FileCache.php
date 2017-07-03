@@ -18,7 +18,8 @@ use SimpleComplex\Cache\Exception\OutOfBoundsException;
 use SimpleComplex\Cache\Exception\RuntimeException;
 
 /**
- * PSR-16 Simple Cache file-based.
+ * PSR-16 Simple Cache file-based
+ * with (default) time-to-live 30 minutes and arg ttl respected.
  *
  * Not compatible with 32-bit PHP, because 32-bit integer too small to handle
  * (mock) eternal time-to-live.
@@ -900,10 +901,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *
      * @var int
      */
-    const TTL_DEFAULT = 0;
+    const TTL_DEFAULT = 30 * 60;
 
     /**
-     * Ignore $ttl argument of item setters and getters.
+     * Ignore ttl argument of item setters and getters.
      *
      * Ignore time-to-live completely, if ignore AND ttl default none (forever).
      *
@@ -970,9 +971,12 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     /**
      * Values: user|group|group_setgid.
      *
+     * Gets set by constructor via resolveSettings().
+     * @see FileCache::resolveSettings()
+     *
      * @var string
      */
-    protected $fileMode = '';
+    protected $fileMode;
 
     /**
      * Default time-to-live.
@@ -981,18 +985,24 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      * - zero: forever, used when set method ttl arg null.
      * - positive: used when set method ttl arg null.
      *
+     * Gets set by constructor via resolveSettings().
+     * @see FileCache::resolveSettings()
+     *
      * @var int
      */
-    protected $ttlDefault = 0;
+    protected $ttlDefault;
 
     /**
-     * Ignore $ttl argument of item setters and getters.
+     * Ignore ttl argument of item setters and getters.
      *
      * Ignore time-to-live completely, if ignore AND ttl default none (forever).
      *
+     * Gets set by constructor via resolveSettings().
+     * @see FileCache::resolveSettings()
+     *
      * @var bool
      */
-    protected $ttlIgnore = false;
+    protected $ttlIgnore;
 
     /**
      * True upon destroy().

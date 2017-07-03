@@ -238,8 +238,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
@@ -350,8 +349,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
@@ -450,8 +448,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
@@ -623,8 +620,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
@@ -738,8 +734,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
@@ -851,8 +846,7 @@ class CliCache implements CliCommandInterface
         } else {
             $cache_broker_class = static::CLASS_CACHE_BROKER;
         }
-        $cache_class =
-            constant($cache_broker_class . '::CLASS_BY_TYPE')[constant($cache_broker_class . '::TYPE_DEFAULT')];
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
         if (!method_exists($cache_class, 'listInstances')) {
             $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
                 . $cache_class . '], has no static method listInstances().', 'error');
