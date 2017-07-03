@@ -986,6 +986,9 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     protected $isCandidate = false;
 
+    // @todo: ignore constructor arg options, if existing (not new) cache (judged by whether settings and dirs exist already).
+    // @todo: alterSettings(), for changing settings - user (like config) must check if the cache instance isNew().
+
     /**
      * Create or load cache store.
      *

@@ -20,6 +20,8 @@ use Psr\SimpleCache\CacheInterface;
  */
 interface ManageableCacheInterface extends CacheInterface
 {
+    // @todo: isNew() method.
+    // @todo: alterSettings() method.
     /**
      * Check if the cache store has any items at all.
      *
