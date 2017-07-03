@@ -11,6 +11,7 @@ namespace SimpleComplex\Cache;
 
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\Utils;
+use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Cache\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
 use SimpleComplex\Cache\Exception\OutOfBoundsException;
@@ -428,6 +429,17 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     // ManageableCacheInterface.-------------------------------------------------
 
     /**
+     * Check if the cache store was defined as new at instantiation,
+     * or regenerated on the basis of a previous instantiation (configuration).
+     *
+     * @return bool
+     */
+    public function isNew() : bool
+    {
+        return $this->isNew;
+    }
+
+    /**
      * Check if the cache store has any items at all.
      *
      * @return bool
@@ -472,11 +484,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         // Save to settings .ini file, if different.
         if ($time_to_live != $this->ttlDefault) {
             $this->ttlDefault = $time_to_live;
-            $this->saveSettings([
-                'fileMode' => $this->fileMode,
-                'ttlDefault' => $this->ttlDefault,
-                'ttlIgnore' => $this->ttlIgnore,
-            ]);
+            $settings = [];
+            foreach (static::SETTINGS_KEYS as $key) {
+                $settings[$key] = $this->{$key};
+            }
+            $this->saveSettings($settings);
         }
     }
 
@@ -499,11 +511,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         // Save to settings .ini file, if different.
         if ($ignore != $this->ttlIgnore) {
             $this->ttlIgnore = $ignore;
-            $this->saveSettings([
-                'fileMode' => $this->fileMode,
-                'ttlDefault' => $this->ttlDefault,
-                'ttlIgnore' => $this->ttlIgnore,
-            ]);
+            $settings = [];
+            foreach (static::SETTINGS_KEYS as $key) {
+                $settings[$key] = $this->{$key};
+            }
+            $this->saveSettings($settings);
         }
     }
 
@@ -915,6 +927,18 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const GARBAGE_COLLECTION_GRACE = 15 * 60;
 
     /**
+     * Keys of the settings (and equivalent instance vars) saved to the store's
+     * .ini file.
+     *
+     * @var string[]
+     */
+    const SETTINGS_KEYS = [
+        'fileMode',
+        'ttlIgnore',
+        'ttlDefault',
+    ];
+
+    /**
      * Cache store name.
      *
      * @var string
@@ -957,7 +981,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      * - zero: forever, used when set method ttl arg null.
      * - positive: used when set method ttl arg null.
      *
-     * @var integer
+     * @var int
      */
     protected $ttlDefault = 0;
 
@@ -966,7 +990,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *
      * Ignore time-to-live completely, if ignore AND ttl default none (forever).
      *
-     * @var integer
+     * @var bool
      */
     protected $ttlIgnore = false;
 
@@ -980,17 +1004,28 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     protected $destroyed = false;
 
     /**
+     * Whether the cache store was defined as new at instantiation,
+     * or regenerated on the base of a previous instantiation (configuration).
+     *
+     * @var bool
+     */
+    protected $isNew = false;
+
+    /**
      * Write to candidate storage instead of the normal.
      *
      * @var bool
      */
     protected $isCandidate = false;
 
-    // @todo: ignore constructor arg options, if existing (not new) cache (judged by whether settings and dirs exist already).
-    // @todo: alterSettings(), for changing settings - user (like config) must check if the cache instance isNew().
-
     /**
      * Create or load cache store.
+     *
+     * Keeps settings in an .ini file placed along with the cache dir.
+     * Optimized for fast regeneration/load, using existing settings.
+     * Passing options makes things slower - at _every_ instantiation;
+     * instead it's recommended to extend this class, overriding class vars
+     * TTL_DEFAULT/TTL_IGNORE.
      *
      * @param string $name
      * @param array $options {
@@ -1022,7 +1057,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     {
         if (PHP_INT_SIZE < 8) {
             throw new \LogicException(
-                get_class($this) . ' is not compatible with 32-bit PHP.'
+                get_class($this) . ' requires (at least) 64-bit PHP.'
             );
         }
         if (!CacheKey::validate($name)) {
@@ -1042,13 +1077,18 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             $this->path = static::PATH_DEFAULT;
         }
 
-        // Resolve path, and load preexisting settings if they exist.
+        // Resolve path.
+        // If path exists, try loading previously saved settings.
+        // Otherwise do nothing.
         $settings = $this->resolvePath() ? $this->loadSettings() : [];
+
         // Resolve options and final instance var values, and figure out if we
         // need to update filed settings.
         $save_settings = $this->resolveSettings($settings, $options);
-        // Create path, cache dir and tmp dir, if they don't exist.
+
+        // Create store dir, cache dir and tmp dir, if they don't exist.
         $this->ensureDirectories();
+
         // Save/update settings.
         if ($save_settings) {
             $this->saveSettings($settings);
@@ -1056,7 +1096,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     }
 
     /**
-     * Compares preexiting settings with passed options, and set instance vars
+     * Compares pre-existing settings with passed options, and sets instance vars
      * accordingly.
      *
      * Separated from from constructor to accommodate class extension.
@@ -1066,18 +1106,53 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      * @param array $options
      *
      * @return bool
-     *      True: preexisting setting don't exist or differ from options passed.
+     *      True: No pre-existing settings, or an option passed differs
+     *          from the existing setting.
      *
+     * @throws LogicException
+     *      Pre-existing settings misses a bucket.
      * @throws \TypeError
+     *      Bad options bucket.
      */
     protected function resolveSettings(array &$settings, array $options) /*: void*/
     {
-        $diff = !$settings;
-        $settings_exist = !$diff;
+        if ($settings) {
+            foreach (static::SETTINGS_KEYS as $key) {
+                if (!isset($settings[$key])) {
+                    throw new LogicException('Loaded non-empty settings misses \'' . $key . '\' bucket.');
+                }
+                $this->{$key} = $settings[$key];
+            }
+            // Fast lane for regenerated store;
+            // pre-existing settings + no options passed.
+            if (!$options) {
+                // No reason to save settings.
+                return false;
+            }
+
+            $settings_exist = true;
+            // No reason to save settings - so far.
+            $diff = false;
+        } else {
+            $settings['fileMode'] = $this->fileMode = static::FILE_MODE_DEFAULT;
+            $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
+            $settings['ttlIgnore'] = $this->ttlIgnore = static::TTL_IGNORE;
+            // Fast lane for entirely new store;
+            // no pre-existing settings + no options passed.
+            if (!$options) {
+                // Settings must be saved, because there are no pre-existing.
+                return true;
+            }
+
+            $settings_exist = false;
+            // Settings must be saved, because there are no pre-existing.
+            $diff = true;
+        }
 
         // fileMode.
         if (!empty($options['fileMode'])) {
-            // empty() also handles null; that existing setting must rule.
+            // empty() also handles null;
+            // that existing setting (or class default) must rule.
             if (!is_string($options['fileMode'])) {
                 throw new \TypeError('Arg options[fileMode] type['
                     . (!is_object($options['fileMode']) ? gettype($options['fileMode']) :
@@ -1088,51 +1163,42 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                 case 'group':
                 case 'group_setgid':
                     $this->fileMode = $options['fileMode'];
+                    if (!$settings_exist || $settings['fileMode'] != $this->fileMode) {
+                        $diff = true;
+                        $settings['fileMode'] = $this->fileMode;
+                    }
                     break;
                 default:
                     throw new InvalidArgumentException(
                         'Arg fileMode must be user|group|group_setgid or empty, fileMode[' . $options['fileMode'] . '].'
                     );
             }
-            if (!$settings_exist || $options['fileMode'] != $settings['fileMode']) {
-                $diff = true;
-                $settings['fileMode'] = $options['fileMode'];
-            }
-        } elseif ($settings_exist) {
-            $this->fileMode = $settings['fileMode'];
-        } else {
-            $settings['fileMode'] = $this->fileMode = static::FILE_MODE_DEFAULT;
-            // And no settings means diff is already true.
         }
 
         // ttlDefault.
         if (isset($options['ttlDefault'])) {
-            // isset() also handles null; that existing setting must rule.
+            // isset() also handles null;
+            //that existing setting (or class default) must rule.
             if (!$options['ttlDefault']) {
                 $this->ttlDefault = 0;
             } else {
                 $this->ttlDefault = $this->timeToLive($options['ttlDefault']);
             }
-            if (!$settings_exist || $options['ttlDefault'] != $settings['ttlDefault']) {
-                $diff = 1;
-                $settings['ttlDefault'] = $options['ttlDefault'];
+            if (!$settings_exist || $settings['ttlDefault'] != $this->ttlDefault) {
+                $diff = true;
+                $settings['ttlDefault'] = $this->ttlDefault;
             }
-        } elseif ($settings_exist) {
-            $this->ttlDefault = $settings['ttlDefault'];
-        } else {
-            $settings['ttlDefault'] = $this->ttlDefault = static::TTL_DEFAULT;
-            // And no settings means diff is already true.
         }
+
         // ttlIgnore.
         if (isset($options['ttlIgnore'])) {
-            // isset() also handles null; that existing setting must rule.
+            // isset() also handles null;
+            // that existing setting (or class default) must rule.
             $this->ttlIgnore = !!$options['ttlIgnore'];
-
-        } elseif ($settings_exist) {
-            $this->ttlIgnore = $settings['ttlIgnore'];
-        } else {
-            $settings['ttlIgnore'] = $this->ttlIgnore = static::TTL_IGNORE;
-            // And no settings means diff is already true.
+            if (!$settings_exist || $settings['ttlIgnore'] != $this->ttlIgnore) {
+                $diff = true;
+                $settings['ttlIgnore'] = $this->ttlIgnore;
+            }
         }
 
         return $diff;
@@ -1179,11 +1245,15 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         // Ensure cache dir.
         $dir = $this->pathReal . '/stores/' . $this->name;
         if (!file_exists($dir)) {
+            // Seems to be an entirely new cache store.
+            $this->isNew = true;
             $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
         // Ensure general tmp dir.
         $dir = $this->pathReal . '/tmp';
         if (!file_exists($dir)) {
+            // Seems to be an entirely new cache store.
+            $this->isNew = true;
             $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
     }
@@ -1199,12 +1269,13 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     {
         $file = $this->pathReal . '/' . $this->name . '.ini';
         if (file_exists($file)) {
-            $settings = Utils::getInstance()->parseIniFile($file, false, true);
-            if (!$settings && $settings === false) {
-                throw new RuntimeException('Failed to read store settings, file[' . $file . '].');
-            }
-            return $settings;
+            // Not an error if empty; the file may have been save previously
+            // as empty (due to an error or deliberately).
+            return Utils::getInstance()->parseIniFile($file, false, true);
         }
+        // An entirely new store.
+        $this->isNew = true;
+
         return [];
     }
 

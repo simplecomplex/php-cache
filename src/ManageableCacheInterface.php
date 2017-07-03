@@ -20,8 +20,17 @@ use Psr\SimpleCache\CacheInterface;
  */
 interface ManageableCacheInterface extends CacheInterface
 {
-    // @todo: isNew() method.
-    // @todo: alterSettings() method.
+    /**
+     * Check if the cache store was defined as new at instantiation,
+     * or regenerated on the basis of a previous instantiation (configuration).
+     *
+     * @return bool
+     *
+     * @throws \Throwable
+     *      On error.
+     */
+    public function isNew() : bool;
+
     /**
      * Check if the cache store has any items at all.
      *

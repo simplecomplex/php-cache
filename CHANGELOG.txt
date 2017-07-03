@@ -1,3 +1,9 @@
+SimpleComplex/Cache 1.x, 2017-07-03
+-----------------------------------
+- New ManageableCacheInterface required method isNew().
+- Fast lanes for new/regeneration FileCache store instantiation, when no options
+  passed to the constructor.
+
 SimpleComplex/Cache 1.x, 2017-07-02
 -----------------------------------
 - New BackupCacheInterface, and FileCache implementing it.
