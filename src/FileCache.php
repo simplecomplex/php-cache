@@ -1262,8 +1262,6 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         // Ensure general tmp dir.
         $dir = $this->pathReal . '/tmp';
         if (!file_exists($dir)) {
-            // Seems to be an entirely new cache store.
-            $this->isNew = true;
             $utils->ensurePath($dir, static::FILE_MODE['dir_' . $this->fileMode]);
         }
     }

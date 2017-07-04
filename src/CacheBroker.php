@@ -216,7 +216,7 @@ class CacheBroker extends Explorable
         // Actually not sure if that is such a great idea.
         array_unshift($storeConstructorArgs, $name);
 
-        if (!$classNameArAlias) {
+        if (!$classNameArAlias || $classNameArAlias == 'default') {
             $class = static::CACHE_CLASSES['default'];
         } elseif (isset(static::CACHE_CLASSES[$classNameArAlias])) {
             $class = static::CACHE_CLASSES[$classNameArAlias];
