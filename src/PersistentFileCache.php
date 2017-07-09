@@ -25,7 +25,7 @@ namespace SimpleComplex\Cache;
 class PersistentFileCache extends FileCache
 {
     /**
-     * Default time-to-live.
+     * Default time-to-live: zero.
      *
      * Values:
      * - zero: forever.

@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2017-07-09
+-----------------------------------
+- Dynamic garbage collection grace factor (coefficient) is now a class constant;
+  instead of hardcoded.
+
 SimpleComplex/Cache 1.x, 2017-07-03
 -----------------------------------
 - New ManageableCacheInterface required method isNew().

@@ -38,6 +38,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     // \Psr\SimpleCache\CacheInterface members.---------------------------------
 
     /**
+     * Returns cached item if exists and it's time-to-live hasn't expired.
+     *
+     * Deletes existing item if time-to-live and garbage collection grade period
+     * both expired.
+     *
      * @param string $key
      * @param mixed|null $default
      *
@@ -74,7 +79,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             $time = time();
             if ($end_of_life < $time) {
                 if (
-                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE)
+                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * static::GARBAGE_CLLCTN_GRACE_FACTOR) :
+                        static::GARBAGE_CLLCTN_GRACE_NO_DEFAULT)
                     < $time
                 ) {
                     // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
@@ -102,6 +108,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     }
 
     /**
+     * Uses (*nix) atomic file write.
+     *
      * @param string $key
      * @param mixed $value
      *      \Serializable
@@ -134,7 +142,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         }
 
         $file = $this->pathReal . (!$this->isCandidate ? '/stores/' : '/candidates/') . $this->name . '/' . $key;
-        // Uses rename() because that's atomic in *nix systems.
+        // Uses rename() because the OS equivalent mv is atomic in *nix systems.
         // @ is PSR-16 illegal in key, so usable as mock directory separator.
         if (!($tmp_file = tempnam($this->pathReal . '/tmp', $this->name . '@' . $key))) {
             throw new RuntimeException('Failed to reserve temp file.');
@@ -320,6 +328,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     }
 
     /**
+     * Acknowledges cached item if exists and it's time-to-live hasn't expired.
+     *
+     * Deletes existing item if time-to-live and garbage collection grade period
+     * both expired.
+     *
      * @param string $key
      *
      * @return bool
@@ -351,7 +364,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             $time = time();
             if ($end_of_life < $time) {
                 if (
-                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE)
+                    $end_of_life + ($this->ttlDefault ? ($this->ttlDefault * static::GARBAGE_CLLCTN_GRACE_FACTOR) :
+                        static::GARBAGE_CLLCTN_GRACE_NO_DEFAULT)
                     < $time
                 ) {
                     // Suppress PHP notice/warning; file_exists()+unlink() is not atomic.
@@ -523,6 +537,15 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     /**
      * Deletes all cache items that have reached end of life.
      *
+     * Use a cron job to do this.
+     * @code
+     * php [document root]/vendor/simplecomplex/cache/src/cli/cli.phpsh cache-clear-expired --all --yes
+     * @endcode
+     *
+     * @see simplecomplex_cache_cli()
+     * @see CliCache::executeCommand()
+     * @see CliCache::cmdClear()
+     *
      * @return int
      *      Number of items cleared.
      *
@@ -537,7 +560,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         $deleted = 0;
         // Unless time-to-live is to be ignored by all methods/procedures.
         if ($this->ttlDefault || !$this->ttlIgnore) {
-            $grace = $this->ttlDefault ? ($this->ttlDefault * 0.5) : static::GARBAGE_COLLECTION_GRACE;
+            $grace = $this->ttlDefault ? ($this->ttlDefault * static::GARBAGE_CLLCTN_GRACE_FACTOR) :
+                static::GARBAGE_CLLCTN_GRACE_NO_DEFAULT;
             $cache_dir = $this->pathReal . '/stores/' . $this->name;
             $dir_iterator = new \DirectoryIterator($cache_dir);
             foreach ($dir_iterator as $item) {
@@ -893,7 +917,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const TTL_FOREVER = 1000 * 365 * 24 * 60 * 60;
 
     /**
-     * Default time-to-live.
+     * Default time-to-live: 30 minutes.
+     *
+     * 30 minutes should be compatible with common session timeout;
+     * 24 or 30 minutes.
      *
      * Values:
      * - zero: forever.
@@ -904,7 +931,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const TTL_DEFAULT = 30 * 60;
 
     /**
-     * Ignore ttl argument of item setters and getters.
+     * Don't ignore ttl argument of item setters and getters.
      *
      * Ignore time-to-live completely, if ignore AND ttl default none (forever).
      *
@@ -913,19 +940,43 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const TTL_IGNORE = false;
 
     /**
-     * Grace period in which a ttl expired item should not be deleted.
-     * May reduce the risk of current saving/deleting procedures.
-     * Avoid values that are a multiple of common ttl values; for this
-     * particular cache store.
+     * Garbage collection grace is - when non-zero default time-to-live -
+     * this value times default time-to-live.
      *
-     * This default value is only used if the store has no (zero) default
-     * time-to-live.
-     * Whenever the default time-to-live is set (to non-zero), the grace
-     * period will be 0.5 times the default time-to-live.
+     * An expired item still within the grace period will not be deleted;
+     * by get(), has(), clearExpired().
+     * May reduce the risk of current saving/deleting procedures.
+     *
+     * The value of 0.5 (half of default time-to-live) is chosen because
+     * a grace period that's a multiple of time-to-live should be avoided.
+     *
+     * @see FileCache::TTL_DEFAULT
+     * @see FileCache::get()
+     * @see FileCache::has()
+     * @see FileCache::clearExpired()
      *
      * @var int
      */
-    const GARBAGE_COLLECTION_GRACE = 15 * 60;
+    const GARBAGE_CLLCTN_GRACE_FACTOR = 0.5;
+
+    /**
+     * Garbage collection grace used when no default time-to-live.
+     *
+     * An expired item still within the grace period will not be deleted;
+     * by get(), has(), clearExpired().
+     * May reduce the risk of current saving/deleting procedures.
+     *
+     * This value must not be a multiple of common set() ttl arg values
+     * (for the particular cache store).
+     *
+     * @see FileCache::TTL_DEFAULT
+     * @see FileCache::get()
+     * @see FileCache::has()
+     * @see FileCache::clearExpired()
+     *
+     * @var int
+     */
+    const GARBAGE_CLLCTN_GRACE_NO_DEFAULT = 15 * 60;
 
     /**
      * Keys of the settings (and equivalent instance vars) saved to the store's
@@ -1033,8 +1084,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *
      * Keeps settings in an .ini file placed along with the cache dir.
      * Optimized for fast regeneration/load, using existing settings.
-     * Passing options makes things slower - at _every_ instantiation;
-     * instead it's recommended to extend this class, overriding class vars
+     * Passing options makes things slower - at _every_ instantiation.
+     * Instead, it's recommended to extend this class, overriding class vars
      * TTL_DEFAULT/TTL_IGNORE.
      *
      * @param string $name
@@ -1055,7 +1106,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *          True: item setters and getters' ttl argument gets ignored.
      * }
      * @throws \LogicException
-     *      If PHP is 32-bit.
+     *      If PHP is less than 64-bit.
      * @throws InvalidArgumentException
      *      Invalid arg name.
      * @throws \TypeError
@@ -1067,7 +1118,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     {
         if (PHP_INT_SIZE < 8) {
             throw new \LogicException(
-                get_class($this) . ' requires (at least) 64-bit PHP.'
+                get_class($this) . ' requires at least 64-bit PHP.'
             );
         }
         if (!CacheKey::validate($name)) {
@@ -1375,6 +1426,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      * instantiates them, and returns a list of them.
      *
      * Looks for [store name].ini files in the path.
+     *
+     * The instances will/should be of this class or an extending class.
      *
      * @see FileCache::PATH_DEFAULT
      *

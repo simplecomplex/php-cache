@@ -18,7 +18,10 @@ namespace SimpleComplex\Cache;
 class FixedTtlFileCache extends FileCache
 {
     /**
-     * Default time-to-live.
+     * Default time-to-live: 30 minutes.
+     *
+     * 30 minutes should be compatible with common session timeout;
+     * 24 or 30 minutes.
      *
      * Values:
      * - zero: forever.

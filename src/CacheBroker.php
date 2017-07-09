@@ -228,7 +228,7 @@ class CacheBroker extends Explorable
             }
             if (!is_subclass_of($classNameArAlias, CacheInterface::class)) {
                 throw new InvalidArgumentException(
-                    'Class doesn\'t implement PSR-16 CacheInterface, arg classNameArAlias[' . $classNameArAlias . '].'
+                    'Class doesn\'t implement Psr\SimpleCache\CacheInterface, arg classNameArAlias[' . $classNameArAlias . '].'
                 );
             }
             $class = $classNameArAlias;
