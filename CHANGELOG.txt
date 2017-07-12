@@ -1,0 +1,71 @@
+SimpleComplex/Cache 1.x, 2017-07-12
+-----------------------------------
+- Release 1.0.
+
+SimpleComplex/Cache 1.x, 2017-07-09
+-----------------------------------
+- Dynamic garbage collection grace factor (coefficient) is now a class constant;
+  instead of hardcoded.
+
+SimpleComplex/Cache 1.x, 2017-07-03
+-----------------------------------
+- New ManageableCacheInterface required method isNew().
+- Fast lanes for new/regeneration FileCache store instantiation, when no options
+  passed to the constructor.
+- Use FileCache extending classes to define default ttl and ignore ttl,
+  instead of constructor arg options.
+- CacheBroker constructor now accept concrete cache class name as well as class
+  aliases for base, default, variable_ttl, fixed_ttl and persistent.
+
+SimpleComplex/Cache 1.x, 2017-07-02
+-----------------------------------
+- New BackupCacheInterface, and FileCache implementing it.
+- New CLI commands backup and restore.
+- Exportable.
+- Safer CLI exception handler, which catches errors that it itself
+  instigates; errors occurring while instantiating container objects.
+
+SimpleComplex/Cache 1.x, 2017-06-25
+-----------------------------------
+- Inspect class overridable.
+- Renamed cli function to facilitate 'override' in extending packages.
+
+SimpleComplex/Cache 1.x, 2017-06-24
+-----------------------------------
+- Cache cli complete.
+
+SimpleComplex/Cache 1.x, 2017-06-21
+-----------------------------------
+- Don't use 'iterable' type; effectively useless because stdClass is iterable
+  but not 'iterable' (PHP still sucks type-wise).
+
+SimpleComplex/Cache 1.x, 2017-06-18
+-----------------------------------
+- Require 64-bit PHP.
+- Manageable cache interface extending PSR-16 Simple Cache, to require methods
+  isEmpty, setTtlDefault and setTtlIgnore.
+- FileCache time-to-live algo now differentiates (and combines) none and ignore.
+- FileCache garbage collection grace.
+- FileCache implement ManagableCacheInterface::clearExpired().
+
+SimpleComplex/Cache 1.x, 2017-06-16
+-----------------------------------
+- Use CacheKey::validate() for all name and key arguments.
+
+SimpleComplex/Cache 1.x, 2017-06-13
+-----------------------------------
+- FileCache implement extension of CacheInterface, which requires an empty()
+  method.
+
+SimpleComplex/Cache 1.x, 2017-06-11
+-----------------------------------
+- FileCache fileMode option. And the class seem to work.
+- Use own exception types, not types declared in Utils.
+
+SimpleComplex/Cache 1.x, 2017-06-06
+-----------------------------------
+- CacheBroker is now Utils\Explorable, listing registered cache stores.
+
+SimpleComplex/Cache 1.x, 2017-05-31
+-----------------------------------
+- Initial.
