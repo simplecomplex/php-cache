@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-07-12
+-----------------------------------
+- Release 1.0.
+
 SimpleComplex/Cache 1.x, 2017-07-09
 -----------------------------------
 - Dynamic garbage collection grace factor (coefficient) is now a class constant;
