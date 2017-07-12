@@ -1,17 +1,5 @@
 ## Cache ##
 
-#### Requirements ####
-
-- PHP >=7.0
-- 64-bit PHP
-- [PSR-16 Simple Cache](https://github.com/php-fig/simple-cache)
-- [SimpleComplex Utils](https://github.com/simplecomplex/php-utils)
-
-##### Suggestions #####
-
-- [SimpleComplex Inspect](https://github.com/simplecomplex/inspect) (for CLI)
-
-
 ### Scope ###
 
 Caching of complex variables, and variables which are expensive to retrieve or generate.  
@@ -66,3 +54,14 @@ Defines two extensions to the PSR-16 CacheInterface, implemented by ``` FileCach
 
 - backup/restore
 - replacing a store, by building a 'candidate' and switching to that when it's complete
+
+### Requirements ###
+
+- PHP >=7.0
+- 64-bit PHP
+- [PSR-16 Simple Cache](https://github.com/php-fig/simple-cache)
+- [SimpleComplex Utils](https://github.com/simplecomplex/php-utils)
+
+##### Suggestions #####
+
+- [SimpleComplex Inspect](https://github.com/simplecomplex/inspect) (for CLI)

@@ -1,7 +1,7 @@
 {
     "name": "simplecomplex/cache",
     "type": "library",
-    "description": "File-based PSR-16 Simple Cache implementation.",
+    "description": "File-based PSR-16 Simple Cache implementation; cache management; CLI interface.",
     "keywords": ["PSR-16", "simple cache", "PHP"],
     "homepage": "https://github.com/simplecomplex/php-cache",
     "license": "MIT",
