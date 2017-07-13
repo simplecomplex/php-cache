@@ -11,7 +11,7 @@ Not page caching, no [stampede protection](https://en.wikipedia.org/wiki/Cache_s
 
 **``` CacheBroker ```** decouples code using cache from the actual PSR-16 cache implementation.
 
-Defines the three cache class aliases:
+Defines three cache class aliases:
 
 - _variable time-to-live_ (default ttl and set() arg ttl)
 - _fixed time-to-live_ (default ttl, set() arg ttl ignored)
@@ -45,7 +45,7 @@ Defines two extensions to the PSR-16 CacheInterface, implemented by ``` FileCach
 
 **``` ManageableCacheInterface ```**  
 
-- is the cache new or empty?
+- is the cache store new or empty?
 - setting default time-to-live; setting 'ignore' set() arg ttl
 - clearing and exporting
 - listing all cache stores
