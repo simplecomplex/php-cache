@@ -256,9 +256,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function getMultiple($keys, $default = null)
     {
         if (!is_array($keys) && !is_object($keys)) {
-            throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
-            );
+            throw new \TypeError('Arg keys type[' . Utils::getType($keys) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -285,10 +283,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function setMultiple($values, $ttl = null)
     {
         if (!is_array($values) && !is_object($values)) {
-            throw new \TypeError(
-                'Arg values type[' . (!is_object($values) ? gettype($values) : get_class($values))
-                . '] is not array|object.'
-            );
+            throw new \TypeError('Arg values type[' . Utils::getType($values) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -313,9 +308,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function deleteMultiple($keys)
     {
         if (!is_array($keys) && !is_object($keys)) {
-            throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
-            );
+            throw new \TypeError('Arg keys type[' . Utils::getType($keys) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -1129,9 +1122,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
 
         if (!empty($options['path'])) {
             if (!is_string($options['path'])) {
-                throw new \TypeError('Arg options[path] type['
-                    . (!is_object($options['path']) ? gettype($options['path']) :
-                        get_class($options['path'])) . '] is not string.');
+                throw new \TypeError('Arg options[path] type[' . Utils::getType($options['path']) . '] is not string.');
             }
             $this->path = $options['path'];
         } else {
@@ -1215,9 +1206,9 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             // empty() also handles null;
             // that existing setting (or class default) must rule.
             if (!is_string($options['fileMode'])) {
-                throw new \TypeError('Arg options[fileMode] type['
-                    . (!is_object($options['fileMode']) ? gettype($options['fileMode']) :
-                        get_class($options['fileMode'])) . '] is not string.');
+                throw new \TypeError(
+                    'Arg options[fileMode] type[' . Utils::getType($options['fileMode']) . '] is not string.'
+                );
             }
             switch ($options['fileMode']) {
                 case 'user':
