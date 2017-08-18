@@ -673,7 +673,8 @@ class CliCache implements CliCommandInterface
     }
 
     /**
-     * Ignores pre-confirmation --yes/-y option.
+     * Ignores pre-confirmation --yes/-y option,
+     * unless .risky_command_skip_confirm file placed in document root.
      *
      * @return void
      *      Exits.
@@ -705,6 +706,11 @@ class CliCache implements CliCommandInterface
                 $this->command->inputErrors[] = 'The \'backup\' argument must be a name, not a path.';
             }
         }
+        // Pre-confirmation --yes/-y ignored for this command.
+        if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
+            $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
+                . "\n" . 'unless .risky_command_skip_confirm file placed in document root.';
+        }
         if ($this->command->inputErrors) {
             foreach ($this->command->inputErrors as $msg) {
                 $this->environment->echoMessage(
@@ -717,15 +723,17 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        $this->environment->echoMessage(
-            $this->environment->format(
-                $this->environment->format($this->command->name, 'emphasize')
-                . "\n" . 'store: ' . $store
-                . "\n" . 'backup: ' . $backup
-                . (!$this->command->options ? '' : ("\n--" . join(' --', array_keys($this->command->options)))),
-                'hangingIndent'
-            )
-        );
+        if ($this->environment->riskyCommandRequireConfirm || !$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . 'store: ' . $store
+                    . "\n" . 'backup: ' . $backup
+                    . (!$this->command->options ? '' : ("\n--" . join(' --', array_keys($this->command->options)))),
+                    'hangingIndent'
+                )
+            );
+        }
         // Check if the command is doable.------------------------------
         // Does that store exist?
         if ($container->has('cache-broker')) {
@@ -754,15 +762,23 @@ class CliCache implements CliCommandInterface
             $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
             exit;
         }
-        // Request confirmation, ignore --yes/-y pre-confirmation option.
-        if (
-            !$this->environment->confirm(
+        // Request confirmation, ignore --yes/-y pre-confirmation option;
+        // unless .risky_command_skip_confirm file placed in document root.
+        if ($this->environment->riskyCommandRequireConfirm) {
+            if (!$this->environment->confirm(
                 'Restore cache store from backup? Type \'yes\' to continue:',
                 ['yes'],
                 '',
                 'Aborted restoring cache store from backup.'
-            )
-        ) {
+            )) {
+                exit;
+            }
+        } elseif (!$this->command->preConfirmed && !$this->environment->confirm(
+                'Restore cache store from backup? Type \'yes\' or \'y\' to continue:',
+                ['yes', 'y'],
+                '',
+                'Aborted restoring cache store from backup.'
+            )) {
             exit;
         }
         // Do it.
@@ -786,7 +802,8 @@ class CliCache implements CliCommandInterface
     }
 
     /**
-     * Ignores pre-confirmation --yes/-y option.
+     * Ignores pre-confirmation --yes/-y option,
+     * unless .risky_command_skip_confirm file placed in document root.
      *
      * @return void
      *      Exits.
@@ -816,8 +833,9 @@ class CliCache implements CliCommandInterface
             }
         }
         // Pre-confirmation --yes/-y ignored for this command.
-        if ($this->command->preConfirmed) {
-            $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command.';
+        if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
+            $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
+                . "\n" . 'unless .risky_command_skip_confirm file placed in document root.';
         }
         if ($this->command->inputErrors) {
             foreach ($this->command->inputErrors as $msg) {
@@ -831,13 +849,15 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        $this->environment->echoMessage(
-            $this->environment->format(
-                $this->environment->format($this->command->name, 'emphasize')
-                . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
-                'hangingIndent'
-            )
-        );
+        if ($this->environment->riskyCommandRequireConfirm || !$this->command->preConfirmed) {
+            $this->environment->echoMessage(
+                $this->environment->format(
+                    $this->environment->format($this->command->name, 'emphasize')
+                    . "\n" . (!$all_stores ? ('store: ' . $store) : 'all stores'),
+                    'hangingIndent'
+                )
+            );
+        }
         // Check if the command is doable.------------------------------
         // Does that/these store(s) exist?
         if ($container->has('cache-broker')) {
@@ -867,15 +887,23 @@ class CliCache implements CliCommandInterface
                 $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
                 exit;
             }
-            // Request confirmation, ignore --yes/-y pre-confirmation option.
-            if (
-                !$this->environment->confirm(
+            // Request confirmation, ignore --yes/-y pre-confirmation option,
+            // unless .risky_command_skip_confirm file placed in document root.
+            if ($this->environment->riskyCommandRequireConfirm) {
+                if (!$this->environment->confirm(
                     'Destroy a single cache store? Type \'yes\' to continue:',
                     ['yes'],
                     '',
                     'Aborted destroying a single cache store.'
-                )
-            ) {
+                )) {
+                    exit;
+                }
+            } elseif (!$this->command->preConfirmed && !$this->environment->confirm(
+                    'Destroy a single cache store? Type \'yes\' or \'y\' to continue:',
+                    ['yes', 'y'],
+                    '',
+                    'Aborted destroying a single cache store.'
+                )) {
                 exit;
             }
             // Do it.
@@ -886,15 +914,23 @@ class CliCache implements CliCommandInterface
             }
             exit;
         } else {
-            // Request confirmation, ignore --yes/-y pre-confirmation option.
-            if (
-                !$this->environment->confirm(
+            // Request confirmation, ignore --yes/-y pre-confirmation option;
+            // unless .risky_command_skip_confirm file placed in document root.
+            if ($this->environment->riskyCommandRequireConfirm) {
+                if (!$this->environment->confirm(
                     'Destroy all cache stores? Type \'yes\' to continue:',
                     ['yes'],
                     '',
                     'Aborted destroying all cache stores.'
-                )
-            ) {
+                )) {
+                    exit;
+                }
+            } elseif (!$this->command->preConfirmed && !$this->environment->confirm(
+                    'Destroy all cache stores? Type \'yes\' or \'y\' to continue:',
+                    ['yes', 'y'],
+                    '',
+                    'Aborted destroying all cache stores.'
+                )) {
                 exit;
             }
             // Do it.
