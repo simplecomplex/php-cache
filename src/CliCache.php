@@ -709,7 +709,8 @@ class CliCache implements CliCommandInterface
         // Pre-confirmation --yes/-y ignored for this command.
         if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
             $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
-                . "\n" . 'unless .risky_command_skip_confirm file placed in document root.';
+                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_RISKY_COMMAND_SKIP_CONFIRM'
+                . "\n" . 'or .risky_command_skip_confirm file in document root.';
         }
         if ($this->command->inputErrors) {
             foreach ($this->command->inputErrors as $msg) {
@@ -835,7 +836,8 @@ class CliCache implements CliCommandInterface
         // Pre-confirmation --yes/-y ignored for this command.
         if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
             $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
-                . "\n" . 'unless .risky_command_skip_confirm file placed in document root.';
+                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_RISKY_COMMAND_SKIP_CONFIRM'
+                . "\n" . 'or .risky_command_skip_confirm file in document root.';
         }
         if ($this->command->inputErrors) {
             foreach ($this->command->inputErrors as $msg) {
