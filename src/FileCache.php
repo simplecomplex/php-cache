@@ -626,6 +626,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                 }
             }
         }
+        ksort($collection);
         return $collection;
     }
 

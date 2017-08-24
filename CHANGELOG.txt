@@ -3,6 +3,7 @@ SimpleComplex/Cache 1.x, 2017-07-24
 - CLI commands must respect new command 'silent' property.
 - CLI 'get' command default to print instead default to return the value.
 - CLI 'list' command lists cache store names.
+- Export must sort items by key, to produce idempotent (repeatable) list.
 
 SimpleComplex/Cache 1.x, 2017-07-20
 -----------------------------------
