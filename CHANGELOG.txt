@@ -1,3 +1,9 @@
+SimpleComplex/Cache 1.x, 2017-07-24
+-----------------------------------
+- CLI commands must respect new command 'silent' property.
+- CLI 'get' command default to print instead default to return the value.
+- CLI 'list' command lists cache store names.
+
 SimpleComplex/Cache 1.x, 2017-07-20
 -----------------------------------
 - Cli script find vendor dir fix.

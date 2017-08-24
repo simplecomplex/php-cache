@@ -58,6 +58,19 @@ class CliCache implements CliCommandInterface
         $this->environment->registerCommands(
             new CliCommand(
                 $this,
+                static::COMMAND_PROVIDER_ALIAS . '-list',
+                'List all cache stores.',
+                [
+                ],
+                [
+                    'get' => 'Return comma-separated list, don\'t print.',
+                ],
+                [
+                    'g' => 'get',
+                ]
+            ),
+            new CliCommand(
+                $this,
                 static::COMMAND_PROVIDER_ALIAS . '-get',
                 'Get a cache item.',
                 [
@@ -65,11 +78,11 @@ class CliCache implements CliCommandInterface
                     'key' => 'Cache item key.',
                 ],
                 [
-                    'print' => 'Print to console, don\'t return value.',
+                    'get' => 'Return value, don\'t print it.',
                     'inspect' => 'Print Inspect\'ed value instead of JSON-encoded.',
                 ],
                 [
-                    'p' => 'print',
+                    'g' => 'get',
                     'i' => 'inspect',
                 ]
             ),
@@ -173,8 +186,67 @@ class CliCache implements CliCommandInterface
     protected $environment;
 
     /**
+     * List all cache stores.
+     *
      * @return mixed
-     *      Exits if option 'print'.
+     *      Exits if no/falsy option 'get'.
+     */
+    protected function cmdList() /*: void*/
+    {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
+        $container = Dependency::container();
+        // Validate input. ---------------------------------------------
+        // No arguments.
+
+        $get = !empty($this->command->options['get']);
+
+        if ($this->command->inputErrors) {
+            foreach ($this->command->inputErrors as $msg) {
+                $this->environment->echoMessage(
+                    $this->environment->format($msg, 'hangingIndent'),
+                    'notice'
+                );
+            }
+            // This command's help text.
+            $this->environment->echoMessage("\n" . $this->command);
+            exit;
+        }
+        // Display command and the arg values used.---------------------
+        // No arg values to list.
+        // Check if the command is doable.------------------------------
+        // Does that/these store(s) exist?
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
+        if (!method_exists($cache_class, 'listInstances')) {
+            $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
+                . $cache_class . '], has no static method listInstances().', 'error');
+            exit;
+        }
+        $stores = forward_static_call($cache_class . '::listInstances');
+
+        // Do it.
+        $names = [];
+        foreach ($stores as $instance) {
+            $names[] = $instance->name;
+        }
+        sort($names);
+        if ($get) {
+            return join(',', $names);
+        }
+        $this->environment->echoMessage(join("\n", $names));
+        exit;
+    }
+
+    /**
+     * @return mixed
+     *      Exits if no/falsy option 'get'.
      */
     protected function cmdGet()
     {
@@ -204,8 +276,8 @@ class CliCache implements CliCommandInterface
             }
         }
 
-        $print = !empty($this->command->options['print']);
-        $use_inspect = !empty($this->command->options['inspect']);
+        $get = !empty($this->command->options['get']);
+        $use_inspect = !$get && !empty($this->command->options['inspect']);
 
         if ($this->command->inputErrors) {
             foreach ($this->command->inputErrors as $msg) {
@@ -219,7 +291,7 @@ class CliCache implements CliCommandInterface
             exit;
         }
         // Display command and the arg values used.---------------------
-        if ($print) {
+        if (!$get) {
             $this->environment->echoMessage(
                 $this->environment->format(
                     $this->environment->format($this->command->name, 'emphasize')
@@ -265,7 +337,7 @@ class CliCache implements CliCommandInterface
             exit;
         }
         $value = $cache_store->get($key);
-        if (!$print && !$use_inspect) {
+        if ($get) {
             return $value;
         }
         $this->environment->echoMessage('');
@@ -383,7 +455,7 @@ class CliCache implements CliCommandInterface
         // Do it.
         if (!$cache_store->delete($key)) {
             $this->environment->echoMessage('Failed to delete cache store[' . $store . '] key[' . $key . '].', 'error');
-        } else {
+        } elseif (!$this->command->silent) {
             $this->environment->echoMessage('Deleted cache store[' . $store . '] key[' . $key . '].', 'success');
         }
         exit;
@@ -489,17 +561,20 @@ class CliCache implements CliCommandInterface
                     'Failed to delete all' . (!$expired ? '' : ' expired') . ' items of cache store[' . $store . '].',
                     'error'
                 );
-            } elseif ($success === true) {
-                $this->environment->echoMessage(
-                    'Deleted all' . (!$expired ? '' : ' expired') . ' items of cache store[' . $store . '].',
-                    'success'
-                );
-            } else {
-                $this->environment->echoMessage(
-                    'Deleted ' . (!$expired ? 'all' : $success) . (!$expired ? '' : ' expired')
-                    . ' items of cache store[' . $store . '].',
-                    'success'
-                );
+            } elseif (!$this->command->silent) {
+                if ($success === true) {
+                    $this->environment->echoMessage(
+                        'Deleted all' . (!$expired ? '' : ' expired') . ' items of cache store[' . $store . '].',
+                        'success'
+                    );
+                }
+                else {
+                    $this->environment->echoMessage(
+                        'Deleted ' . (!$expired ? 'all' : $success) . (!$expired ? '' : ' expired')
+                        . ' items of cache store[' . $store . '].',
+                        'success'
+                    );
+                }
             }
             exit;
         } else {
@@ -530,18 +605,21 @@ class CliCache implements CliCommandInterface
                         . $instance->name . '].',
                         'error'
                     );
-                } elseif ($success === true) {
-                    $this->environment->echoMessage(
-                        'Deleted all' . (!$expired ? '' : ' expired') . ' items of cache store['
-                        . $instance->name . '].',
-                        'notice'
-                    );
-                } else {
-                    $this->environment->echoMessage(
-                        'Deleted ' . (!$expired ? 'all' : $success)  . (!$expired ? '' : ' expired')
-                        . ' items of cache store[' . $instance->name . '].',
-                        'notice'
-                    );
+                } elseif (!$this->command->silent) {
+                    if ($success === true) {
+                        $this->environment->echoMessage(
+                            'Deleted all' . (!$expired ? '' : ' expired') . ' items of cache store['
+                            . $instance->name . '].',
+                            'notice'
+                        );
+                    }
+                    else {
+                        $this->environment->echoMessage(
+                            'Deleted ' . (!$expired ? 'all' : $success) . (!$expired ? '' : ' expired')
+                            . ' items of cache store[' . $instance->name . '].',
+                            'notice'
+                        );
+                    }
                 }
             }
             if ($errors) {
@@ -550,7 +628,7 @@ class CliCache implements CliCommandInterface
                     . ' cache stores, encountering ' . $errors . ' errors.',
                     'warning'
                 );
-            } else {
+            } elseif (!$this->command->silent) {
                 $this->environment->echoMessage(
                     'Deleted all' . (!$expired ? '' : ' expired') . ' items of ' . $n_stores . ' cache stores.',
                     'success'
@@ -656,7 +734,7 @@ class CliCache implements CliCommandInterface
         $success = $cache_store->backup($backup);
         if ($success === false) {
             $this->environment->echoMessage('Failed to backup store[' . $store . '].', 'error');
-        } else {
+        } elseif (!$this->command->silent) {
             if (is_int($success)) {
                 $this->environment->echoMessage(
                     'Backed up store[' . $store . '] to backup[' . $backup . '], copying ' . $success . ' items.',
@@ -709,7 +787,7 @@ class CliCache implements CliCommandInterface
         // Pre-confirmation --yes/-y ignored for this command.
         if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
             $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
-                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_RISKY_COMMAND_SKIP_CONFIRM'
+                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_CLI_SKIP_CONFIRM'
                 . "\n" . 'or .risky_command_skip_confirm file in document root.';
         }
         if ($this->command->inputErrors) {
@@ -786,7 +864,7 @@ class CliCache implements CliCommandInterface
         $success = $cache_store->restore($backup);
         if ($success === false) {
             $this->environment->echoMessage('Failed to restore store[' . $store . '] from backup.', 'error');
-        } else {
+        } elseif (!$this->command->silent) {
             if (is_int($success)) {
                 $this->environment->echoMessage(
                     'Restored store[' . $store . '] from backup[' . $backup . '], copying ' . $success . ' items.',
@@ -836,7 +914,7 @@ class CliCache implements CliCommandInterface
         // Pre-confirmation --yes/-y ignored for this command.
         if ($this->environment->riskyCommandRequireConfirm && $this->command->preConfirmed) {
             $this->command->inputErrors[] = 'Pre-confirmation \'yes\'/-y option not supported for this command,'
-                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_RISKY_COMMAND_SKIP_CONFIRM'
+                . "\n" . 'unless env var PHP_LIB_SIMPLECOMPLEX_UTILS_CLI_SKIP_CONFIRM'
                 . "\n" . 'or .risky_command_skip_confirm file in document root.';
         }
         if ($this->command->inputErrors) {
@@ -911,7 +989,7 @@ class CliCache implements CliCommandInterface
             // Do it.
             if (!$cache_store->destroy()) {
                 $this->environment->echoMessage('Failed to destroy cache store[' . $store . '].', 'error');
-            } else {
+            } elseif (!$this->command->silent) {
                 $this->environment->echoMessage('Destroyed cache store[' . $store . '].', 'success');
             }
             exit;
@@ -944,7 +1022,7 @@ class CliCache implements CliCommandInterface
                 if (!$cache_store->destroy()) {
                     ++$errors;
                     $this->environment->echoMessage('Failed to destroy cache store[' . $instance->name . '].', 'error');
-                } else {
+                } elseif (!$this->command->silent) {
                     $this->environment->echoMessage('Destroyed cache store[' . $instance->name . '].', 'notice');
                 }
             }
@@ -953,7 +1031,7 @@ class CliCache implements CliCommandInterface
                     'Destroyed all cache stores, encountering ' . $errors . ' errors.',
                     'warning'
                 );
-            } else {
+            } elseif (!$this->command->silent) {
                 $this->environment->echoMessage('Destroyed ' . $n_stores . ' cache stores.', 'success');
             }
         }
@@ -988,6 +1066,8 @@ class CliCache implements CliCommandInterface
         $this->environment = CliEnvironment::getInstance();
 
         switch ($command->name) {
+            case static::COMMAND_PROVIDER_ALIAS . '-list':
+                return $this->cmdList();
             case static::COMMAND_PROVIDER_ALIAS . '-get':
                 return $this->cmdGet();
             case static::COMMAND_PROVIDER_ALIAS . '-delete':
