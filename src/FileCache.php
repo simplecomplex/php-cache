@@ -688,7 +688,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                         . '] to backup[' . $file_backup . '].'
                     );
                 }
-                if ($file_group_write && !@chmod($file_backup, $file_mode)) {
+                if (
+                    $file_group_write && !@chmod($file_backup, $file_mode)
+                    // Don't err is already group-write, set gid is less important.
+                    && !$utils->isFileGroupWrite(fileperms($file_backup))
+                ) {
                     throw new RuntimeException('Failed to chmod backup file[' . $file_backup . '].');
                 }
                 if ($clone_modified && !@touch($file_backup, $modified)) {
@@ -745,7 +749,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_backup, $dir_original)) {
             throw new RuntimeException('Failed to move backup to store, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_original, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_original, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_original))
+        ) {
             throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
         }
 
@@ -845,7 +853,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_original, $dir_backup)) {
             throw new RuntimeException('Failed to move store to backup, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_backup, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_backup))
+        ) {
             throw new RuntimeException('Failed to chmod backup dir, store[' . $this->name . '].');
         }
 
@@ -853,7 +865,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_candidate, $dir_original)) {
             throw new RuntimeException('Failed to move candidate to current, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_backup, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_backup))
+        ) {
             throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
         }
 
@@ -1340,16 +1356,20 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     protected function saveSettings(array $settings) /*: void*/
     {
+        $utils = Utils::getInstance();
         $file = $this->pathReal . '/' . $this->name . '.ini';
-        $content = Utils::getInstance()->containerToIniString($settings);
+        $content = $utils->containerToIniString($settings);
         $set_mode = $this->fileMode != 'user' && !file_exists($file);
         if (!file_put_contents($file, $content)) {
             throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
         }
-        if ($set_mode) {
-            if (!chmod($file, static::FILE_MODE['file_' . $this->fileMode])) {
-                throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
-            }
+        if (
+            $set_mode
+            && !@chmod($file, static::FILE_MODE['file_' . $this->fileMode])
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($file))
+        ) {
+            throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
         }
     }
 

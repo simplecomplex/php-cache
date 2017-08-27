@@ -2,6 +2,8 @@ SimpleComplex/Cache 1.x, 2017-08-27
 -----------------------------------
 - CLI command cache-list-stores renamed; from cache-list.
 - CLI command cache-list-stores optional 'match' argument.
+- FileCache no longer errs if failing to chmod() to group-write, if the dir/file
+  already is group-write; setting gid is less important.
 
 SimpleComplex/Cache 1.x, 2017-07-24
 -----------------------------------
