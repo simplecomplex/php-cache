@@ -58,9 +58,10 @@ class CliCache implements CliCommandInterface
         $this->environment->registerCommands(
             new CliCommand(
                 $this,
-                static::COMMAND_PROVIDER_ALIAS . '-list',
+                static::COMMAND_PROVIDER_ALIAS . '-list-stores',
                 'List all cache stores.',
                 [
+                    'match' => 'Regex to match against cache store names. Optional.',
                 ],
                 [
                     'get' => 'Return comma-separated list, don\'t print.',
@@ -191,14 +192,21 @@ class CliCache implements CliCommandInterface
      * @return mixed
      *      Exits if no/falsy option 'get'.
      */
-    protected function cmdList() /*: void*/
+    protected function cmdListStores() /*: void*/
     {
         /**
          * @see simplecomplex_cache_cli()
          */
         $container = Dependency::container();
         // Validate input. ---------------------------------------------
-        // No arguments.
+        $match = '';
+        if (
+            !empty($this->command->arguments['match'])
+            && ($match = trim($this->command->arguments['match'])) !== ''
+            && !preg_match('/^\/.+\/[a-zA-Z]*$/', $match)
+        ) {
+            $this->command->inputErrors[] = '\'match\' argument must be slash delimited regular expression.';
+        }
 
         $get = !empty($this->command->options['get']);
 
@@ -234,7 +242,9 @@ class CliCache implements CliCommandInterface
         // Do it.
         $names = [];
         foreach ($stores as $instance) {
-            $names[] = $instance->name;
+            if (!$match || preg_match($match, $instance->name)) {
+                $names[] = $instance->name;
+            }
         }
         sort($names);
         if ($get) {
@@ -1066,8 +1076,8 @@ class CliCache implements CliCommandInterface
         $this->environment = CliEnvironment::getInstance();
 
         switch ($command->name) {
-            case static::COMMAND_PROVIDER_ALIAS . '-list':
-                return $this->cmdList();
+            case static::COMMAND_PROVIDER_ALIAS . '-list-stores':
+                return $this->cmdListStores();
             case static::COMMAND_PROVIDER_ALIAS . '-get':
                 return $this->cmdGet();
             case static::COMMAND_PROVIDER_ALIAS . '-delete':
