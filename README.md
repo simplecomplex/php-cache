@@ -2,7 +2,7 @@
 
 ### Scope ###
 
-Caching of complex variables, and variables which are expensive to retrieve or generate.  
+Caching of complex variables, and variables which are expensive to generate.  
 Like configuration, localization and service responses.
 
 Not page caching, no [stampede protection](https://en.wikipedia.org/wiki/Cache_stampede).
@@ -21,7 +21,7 @@ Defines three cache class aliases:
 
 Ask ``` CacheBroker ``` for an aliased type of cache instance - do _not_ instantiate a particular cache class.
 
-Extend ``` CacheBroker ```, when you want to switch from say file-based to database-based caching.
+Extend ``` CacheBroker ```, if you later want to switch from say file-based to database-based caching.
 
 ### File-based caching ###
 
@@ -54,6 +54,31 @@ Defines two extensions to the PSR-16 CacheInterface, implemented by ``` FileCach
 
 - backup/restore
 - replacing a store, by building a 'candidate' and switching to that when it's complete
+
+### Example ###
+
+```php
+$container = SomeDependencyInjectionContainer();
+$container->set('cache-broker', function () {
+    return new \SimpleComplex\Cache\CacheBroker();
+});
+// ...
+$container = SomeDependencyInjectionContainer();
+/** @var \SimpleComplex\Cache\CacheBroker $cache_broker */
+$cache_broker = $container->get('cache-broker');
+/**
+ * Create or re-initialize a cache store.
+ *
+ * @var \SimpleComplex\Cache\FileCache $cache_store
+ */
+$cache_store = $cache_broker->getStore(
+    'some-cache-store',
+    CacheBroker::CACHE_VARIABLE_TTL
+);
+unset($cache_broker);
+/** @var mixed $whatever */
+$whatever = $cache_store->get('some-key', 'the default value');
+```
 
 ### Requirements ###
 

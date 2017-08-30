@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-08-30
+-----------------------------------
+- README supposedly complete.
+
 SimpleComplex/Cache 1.x, 2017-08-27
 -----------------------------------
 - CLI command cache-list-stores renamed; from cache-list.
