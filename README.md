@@ -58,12 +58,14 @@ Defines two extensions to the PSR-16 CacheInterface, implemented by ``` FileCach
 ### Example ###
 
 ```php
+// Bootstrap.
 Dependency::genericSet('cache-broker', function () {
     return new \SimpleComplex\Cache\CacheBroker();
 });
 // ...
-/** @var @ \Container\ContainerInterface $container */
-$container = SomeDependencyInjectionContainer();
+// Use.
+/** @var \Psr\Container\ContainerInterface $container */
+$container = Dependency::container();
 /** @var \SimpleComplex\Cache\CacheBroker $cache_broker */
 $cache_broker = $container->get('cache-broker');
 /**
