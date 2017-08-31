@@ -1,0 +1,2 @@
+@todo: double key length file cache classes and CacheKeyLong class (for validation and mock response caching, due to long variant names).
+@todo: nb: will not work for config and therefore nor for locale-text, and that's that (no prob so far).
