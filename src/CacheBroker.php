@@ -11,6 +11,7 @@ namespace SimpleComplex\Cache;
 
 use Psr\SimpleCache\CacheInterface;
 use SimpleComplex\Utils\Explorable;
+use SimpleComplex\Cache\Interfaces\ManageableCacheInterface;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
 use SimpleComplex\Cache\Exception\OutOfBoundsException;
 use SimpleComplex\Cache\Exception\RuntimeException;
@@ -129,6 +130,9 @@ class CacheBroker extends Explorable
         'variable_ttl' => FileCache::class,
         'fixed_ttl' => FixedTtlFileCache::class,
         'persistent' => PersistentFileCache::class,
+        'key_long_variable_ttl' => KeyLongFileCache::class,
+        'key_long_fixed_ttl' => KeyLongFixedTtlFileCache::class,
+        'key_long_persistent' => KeyLongPersistentFileCache::class,
     ];
 
     /**
@@ -158,6 +162,27 @@ class CacheBroker extends Explorable
      * @var string
      */
     const CACHE_PERSISTENT = 'persistent';
+
+    /**
+     * Variable time-to-live (long keys) cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_KEY_LONG_VARIABLE_TTL = 'key_long_variable_ttl';
+
+    /**
+     * Fixed time-to-live (long keys) cache class alias.
+     *
+     * @var string
+     */
+    const CACHE_KEY_LONG_FIXED_TTL = 'key_long_fixed_ttl';
+
+    /**
+     * Persistent cache (long keys) class alias.
+     *
+     * @var string
+     */
+    const CACHE_KEY_LONG_PERSISTENT = 'key_long_persistent';
 
     /**
      * @var array

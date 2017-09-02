@@ -11,6 +11,8 @@ namespace SimpleComplex\Cache;
 
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\Utils;
+use SimpleComplex\Cache\Interfaces\ManageableCacheInterface;
+use SimpleComplex\Cache\Interfaces\BackupCacheInterface;
 use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Cache\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
@@ -58,7 +60,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function get($key, $default = null)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -129,7 +131,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function set($key, $value, $ttl = null)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -205,7 +207,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function delete($key)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -336,7 +338,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function has($key)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -941,9 +943,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const TTL_DEFAULT = 30 * 60;
 
     /**
-     * Don't ignore ttl argument of item setters and getters.
-     *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Don't ignore ttl argument of item setters.
      *
      * @var int
      */
@@ -1054,9 +1054,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     protected $ttlDefault;
 
     /**
-     * Ignore ttl argument of item setters and getters.
+     * Ignore ttl argument of item setters.
      *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Ignore time-to-live completely,
+     * if ignore AND ttl default is none (forever).
      *
      * Gets set by constructor via resolveSettings().
      * @see FileCache::resolveSettings()
@@ -1132,7 +1133,9 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             );
         }
         if (!CacheKey::validate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name['
+            // Doesn't use instance method validateKey(), because
+            // KeyLongCacheInterface extender shan't allow longer store name.
+            throw new InvalidArgumentException('Arg name is empty, contains illegal char(s) or has wrong length, name['
                 . $name . '].');
         }
         $this->name = $name;
@@ -1162,6 +1165,78 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if ($save_settings) {
             $this->saveSettings($settings);
         }
+    }
+
+    /**
+     * @uses CacheKey::validate()
+     *
+     * @param string $key
+     *
+     * @return bool
+     */
+    public function validateKey(string $key)
+    {
+        return CacheKey::validate($key);
+    }
+
+    /**
+     * Average, and not exact; doesn't consider the year-divisible-by-400 rule.
+     *
+     * @var float
+     */
+    const DAYS_OF_YEAR = 365.25;
+
+    /**
+     * Flawed leap year implementation; uses an average, doesn't check if any
+     * of current year(s) is leap year.
+     *
+     * @param int|\DateInterval|null $ttl
+     *      Non-empty must be non-negative.
+     *
+     * @return int
+     *      Seconds.
+     *
+     * @throws \TypeError
+     * @throws RuntimeException
+     *      Arg ttl resolves to negative integer.
+     */
+    public function timeToLive($ttl) : int
+    {
+        if ($ttl) {
+            if (is_int($ttl)) {
+                if ($ttl < 0) {
+                    throw new RuntimeException('Time-to-live cannot be negative, saw int[' . $ttl . '].');
+                }
+                return $ttl;
+            }
+            if (is_a($ttl, \DateInterval::class)) {
+                $secs = (int) floor(
+                        + ($ttl->y * static::DAYS_OF_YEAR * 24 * 60 * 60)
+                        + ($ttl->m * (static::DAYS_OF_YEAR / 12) * 24 * 60 * 60)
+                        + ($ttl->d * 24 * 60 * 60)
+                        + ($ttl->h * 60 * 60)
+                        + ($ttl->i * 60)
+                        + $ttl->s
+                    ) * (!$ttl->invert ? 1 : -1);
+                if ($secs < 0) {
+                    throw new RuntimeException('Time-to-live cannot be negative, saw DateInterval['
+                        . join(', ', array(
+                            'y' => $ttl->y,
+                            'm' => $ttl->m,
+                            'd' => $ttl->d,
+                            'h' => $ttl->h,
+                            'i' => $ttl->i,
+                            's' => $ttl->s,
+                            'invert' => $ttl->invert,
+                        ))
+                        . '].'
+                    );
+                }
+                return $secs;
+            }
+            throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
+        }
+        return 0;
     }
 
     /**
@@ -1371,66 +1446,6 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         ) {
             throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
         }
-    }
-
-    /**
-     * Average, and not exact; doesn't consider the year-divisible-by-400 rule.
-     *
-     * @var float
-     */
-    const DAYS_OF_YEAR = 365.25;
-
-    /**
-     * Flawed leap year implementation; uses an average, doesn't check if any
-     * of current year(s) is leap year.
-     *
-     * @param int|\DateInterval|null $ttl
-     *      Non-empty must be non-negative.
-     *
-     * @return int
-     *      Seconds.
-     *
-     * @throws \TypeError
-     * @throws RuntimeException
-     *      Arg ttl resolves to negative integer.
-     */
-    protected function timeToLive($ttl) : int
-    {
-        if ($ttl) {
-            if (is_int($ttl)) {
-                if ($ttl < 0) {
-                    throw new RuntimeException('Time-to-live cannot be negative, saw int[' . $ttl . '].');
-                }
-                return $ttl;
-            }
-            if (is_a($ttl, \DateInterval::class)) {
-                $secs = (int) floor(
-                        + ($ttl->y * static::DAYS_OF_YEAR * 24 * 60 * 60)
-                        + ($ttl->m * (static::DAYS_OF_YEAR / 12) * 24 * 60 * 60)
-                        + ($ttl->d * 24 * 60 * 60)
-                        + ($ttl->h * 60 * 60)
-                        + ($ttl->i * 60)
-                        + $ttl->s
-                    ) * (!$ttl->invert ? 1 : -1);
-                if ($secs < 0) {
-                    throw new RuntimeException('Time-to-live cannot be negative, saw DateInterval['
-                        . join(', ', array(
-                            'y' => $ttl->y,
-                            'm' => $ttl->m,
-                            'd' => $ttl->d,
-                            'h' => $ttl->h,
-                            'i' => $ttl->i,
-                            's' => $ttl->s,
-                            'invert' => $ttl->invert,
-                        ))
-                        . '].'
-                    );
-                }
-                return $secs;
-            }
-            throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
-        }
-        return 0;
     }
 
     /**

@@ -9,13 +9,15 @@ declare(strict_types=1);
 
 namespace SimpleComplex\Cache;
 
+use SimpleComplex\Cache\Interfaces\FixedTtlCacheInterface;
+
 /**
  * PSR-16 Simple Cache file-based
  * with time-to-live 30 minutes and arg ttl ignored.
  *
  * @package SimpleComplex\Cache
  */
-class FixedTtlFileCache extends FileCache
+class FixedTtlFileCache extends FileCache implements FixedTtlCacheInterface
 {
     /**
      * Default time-to-live: 30 minutes.
@@ -32,9 +34,7 @@ class FixedTtlFileCache extends FileCache
     const TTL_DEFAULT = 30 * 60;
 
     /**
-     * Ignore ttl argument of item setters and getters.
-     *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Ignore ttl argument of item setters.
      *
      * @var int
      */

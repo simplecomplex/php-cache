@@ -1,3 +1,10 @@
+SimpleComplex/Cache 1.x, 2017-09-02
+-----------------------------------
+- Interface, key validator and FileCache extenders which allow longer item key;
+  max. length 128 versus PSR-16 Simple Cache 64.
+- Interfaces for fixed time-to-live and persistent.
+- FileCache timeToLive() method public.
+
 SimpleComplex/Cache 1.x, 2017-08-30
 -----------------------------------
 - README supposedly complete.

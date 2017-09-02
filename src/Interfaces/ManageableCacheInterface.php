@@ -7,7 +7,7 @@
  */
 declare(strict_types=1);
 
-namespace SimpleComplex\Cache;
+namespace SimpleComplex\Cache\Interfaces;
 
 use Psr\SimpleCache\CacheInterface;
 

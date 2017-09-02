@@ -13,6 +13,9 @@ use SimpleComplex\Utils\CliCommandInterface;
 use SimpleComplex\Utils\CliEnvironment;
 use SimpleComplex\Utils\CliCommand;
 use SimpleComplex\Utils\Dependency;
+use SimpleComplex\Cache\Interfaces\KeyLongCacheInterface;
+use SimpleComplex\Cache\Interfaces\ManageableCacheInterface;
+use SimpleComplex\Cache\Interfaces\BackupCacheInterface;
 
 /**
  * CLI only.
@@ -281,7 +284,9 @@ class CliCache implements CliCommandInterface
                 'Empty \'key\' argument.';
         } else {
             $key = $this->command->arguments['key'];
-            if (!CacheKey::validate($key)) {
+            // Use long key checker here, and then check again if store isn't
+            // KeyLongCacheInterface.
+            if (!CacheKeyLong::validate($key)) {
                 $this->command->inputErrors[] = 'Invalid \'key\' argument.';
             }
         }
@@ -338,6 +343,15 @@ class CliCache implements CliCommandInterface
         if (!$cache_store) {
             $this->environment->echoMessage('');
             $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
+            exit;
+        }
+        // Check key again, now that we know whether the store allows long keys.
+        if (!($cache_store instanceof KeyLongCacheInterface) && !CacheKey::validate($key)) {
+            $this->environment->echoMessage('');
+            $this->environment->echoMessage(
+                'Invalid \'key\' argument, length ' . strlen($key) . ' exceeds max ' . CacheKey::VALID_LENGTH_MAX . '.',
+                'notice'
+            );
             exit;
         }
         // Do it.
@@ -397,7 +411,9 @@ class CliCache implements CliCommandInterface
                 'Empty \'key\' argument.';
         } else {
             $key = $this->command->arguments['key'];
-            if (!CacheKey::validate($key)) {
+            // Use long key checker here, and then check again if store isn't
+            // KeyLongCacheInterface.
+            if (!CacheKeyLong::validate($key)) {
                 $this->command->inputErrors[] = 'Invalid \'key\' argument.';
             }
         }
@@ -447,7 +463,17 @@ class CliCache implements CliCommandInterface
             }
         }
         if (!$cache_store) {
+            $this->environment->echoMessage('');
             $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
+            exit;
+        }
+        // Check key again, now that we know whether the store allows long keys.
+        if (!($cache_store instanceof KeyLongCacheInterface) && !CacheKey::validate($key)) {
+            $this->environment->echoMessage('');
+            $this->environment->echoMessage(
+                'Invalid \'key\' argument, length ' . strlen($key) . ' exceeds max ' . CacheKey::VALID_LENGTH_MAX . '.',
+                'notice'
+            );
             exit;
         }
         // Request confirmation, unless user used the --yes/-y option.
