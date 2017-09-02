@@ -17,6 +17,8 @@ Defines three cache class aliases:
 - _fixed time-to-live_ (default ttl, set() arg ttl ignored)
 - _persistent_ (default ttl 'forever' and set() arg ttl ignored)
 
+Plus three like the above which allow long keys; length 128 instead of the PSR-16 compliant 64.
+
 #### How to use ####
 
 Ask ``` CacheBroker ``` for an aliased type of cache instance - do _not_ instantiate a particular cache class.
