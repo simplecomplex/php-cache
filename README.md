@@ -84,6 +84,10 @@ unset($cache_broker);
 $whatever = $cache_store->get('some-key', 'the default value');
 ```
 
+### CLI commands ###
+
+@todo: List CLI commands (and do same in other packages).
+
 ### Requirements ###
 
 - PHP >=7.0
