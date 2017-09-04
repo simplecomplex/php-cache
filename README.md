@@ -28,6 +28,11 @@ Ask ``` CacheBroker ``` for an aliased type of cache instance - do _not_ instant
 
 Extend ``` CacheBroker ```, if you later want to switch from say file-based to database-based caching.
 
+#### Dependency injection container ID: cache-broker ####
+
+Recommendation: access (and thus instantiate) the cache broker via DI container ID 'cache-broker'.  
+See [SimpleComplex Utils](https://github.com/simplecomplex/php-utils) ``` Dependency ```.
+
 ### File-based caching ###
 
 **``` FileCache ```** is a thorough and cautious PSR-16 Simple Cache implementation; file-based.  
