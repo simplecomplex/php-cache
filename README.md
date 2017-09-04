@@ -1,5 +1,8 @@
 ## Cache ##
 
+- [Installation](#installation)
+- [Requirements](#requirements)
+
 ### Scope ###
 
 Caching of complex variables, and variables which are expensive to generate.  
@@ -86,7 +89,52 @@ $whatever = $cache_store->get('some-key', 'the default value');
 
 ### CLI commands ###
 
-@todo: List CLI commands (and do same in other packages).
+```bash
+# List all cache commands and their help.
+php cli.phpsh cache -h
+# One command's help.
+php cli.phpsh cache-xxx -h
+
+# List existing cache stores.
+php cli.phpsh cache-list-stores
+
+# Display/get value of a cache item.
+php cli.phpsh cache-get store key
+
+# Delete a cache item.
+php cli.phpsh cache-delete store key
+
+# Delete all expired items of one or all cache stores.
+php cli.phpsh cache-clear-expired
+
+# Delete all items of one or all cache stores.
+php cli.phpsh cache-clear
+
+# Backup a cache store.
+php cli.phpsh cache-backup store
+
+# Restore a cache store from backup.
+php cli.phpsh cache-restore store
+
+# Destroy one or all cache stores.
+php cli.phpsh cache-destroy
+```
+
+### Installation ###
+
+Create a 'private' files directory alongside the document root dir  
+and make it writable for the webserver user (www-data or apache).
+
+Like:  
+```/var/www/my-host/```**```http```**  
+```/var/www/my-host/```**```private```**
+
+On first cache store instantiation, **```FileCache```** will create directory  
+```private/```**```lib/simplecomplex/file-cache```**
+
+If that directory structure isn't suitable, do either:
+- supply **```CacheBroker```** (or **```FileCache```** constructor directly) with a 'path' argument
+- extend **```FileCache```** and override it's class constant **```PATH_DEFAULT```**
 
 ### Requirements ###
 
