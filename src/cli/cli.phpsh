@@ -10,13 +10,15 @@ declare(strict_types=1);
 // Include Composer autoloader - re-usable snippet.-----------------------------
 (function()
 {
+    $path = getcwd();
+    $dir = dirname($path);
     // Executed in [package] dir.
-    if (basename(dirname(dirname($path = getcwd()))) == 'vendor') {
+    if (basename(dirname($dir)) == 'vendor') {
         require '../../autoload.php';
         return;
     }
     // Executed in [package]/src/cli.
-    elseif (basename($path) == 'cli' && basename(dirname($path)) == 'src') {
+    elseif (basename($path) == 'cli' && basename($dir) == 'src') {
         require '../../../../autoload.php';
         return;
     }
@@ -26,7 +28,7 @@ declare(strict_types=1);
     if (file_exists($vendor_dir) && is_dir($vendor_dir)) {
         $vendor_path = $vendor_dir;
     } else {
-        $iter = new \FilesystemIterator('', \FilesystemIterator::FOLLOW_SYMLINKS);
+        $iter = new \FilesystemIterator($path, \FilesystemIterator::FOLLOW_SYMLINKS);
         foreach ($iter as $item) {
             if ($item->isDir()) {
                 $path = $item->getPathName();
@@ -89,7 +91,7 @@ function simplecomplex_cache_cli()
         });
     }
     if (class_exists('\\SimpleComplex\\Inspect\\Inspect')) {
-        Dependency::genericSet('inspector', function() use ($container) {
+        Dependency::genericSet('inspect', function() use ($container) {
             return new \SimpleComplex\Inspect\Inspect($container->has('config') ? $container->get('config') : null);
         });
     }
@@ -100,8 +102,8 @@ function simplecomplex_cache_cli()
         try {
             $container = Dependency::container();
             $trace = null;
-            if ($container->has('inspector')) {
-                $trace = '' . $container->get('inspector')->trace($throwable);
+            if ($container->has('inspect')) {
+                $trace = '' . $container->get('inspect')->trace($throwable);
             }
             if ($container->has('logger')) {
                 $container->get('logger')->error($trace ?? $throwable);

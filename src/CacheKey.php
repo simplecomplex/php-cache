@@ -33,12 +33,16 @@ namespace SimpleComplex\Cache;
 class CacheKey
 {
     /**
-     * @var int[]
+     * @var int
      */
-    const VALID_LENGTH = [
-        'min' => 2,
-        'max' => 64,
-    ];
+    const VALID_LENGTH_MIN = 2;
+
+    /**
+     * PSR-16 Simple Cache requirement.
+     *
+     * @var int
+     */
+    const VALID_LENGTH_MAX = 64;
 
     /**
      * Legal non-alphanumeric characters of a cache key.
@@ -74,7 +78,7 @@ class CacheKey
     public static function validate(string $key) : bool
     {
         $le = strlen($key);
-        if ($le < static::VALID_LENGTH['min'] || $le > static::VALID_LENGTH['max']) {
+        if ($le < static::VALID_LENGTH_MIN || $le > static::VALID_LENGTH_MAX) {
             return false;
         }
         if ($key{0} === '-') {

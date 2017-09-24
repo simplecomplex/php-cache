@@ -11,6 +11,8 @@ namespace SimpleComplex\Cache;
 
 use SimpleComplex\Utils\Explorable;
 use SimpleComplex\Utils\Utils;
+use SimpleComplex\Cache\Interfaces\ManageableCacheInterface;
+use SimpleComplex\Cache\Interfaces\BackupCacheInterface;
 use SimpleComplex\Cache\Exception\LogicException;
 use SimpleComplex\Cache\Exception\CacheInvalidArgumentException;
 use SimpleComplex\Cache\Exception\InvalidArgumentException;
@@ -58,7 +60,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function get($key, $default = null)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -129,7 +131,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function set($key, $value, $ttl = null)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -205,7 +207,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function delete($key)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -256,9 +258,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function getMultiple($keys, $default = null)
     {
         if (!is_array($keys) && !is_object($keys)) {
-            throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
-            );
+            throw new \TypeError('Arg keys type[' . Utils::getType($keys) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -285,10 +285,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function setMultiple($values, $ttl = null)
     {
         if (!is_array($values) && !is_object($values)) {
-            throw new \TypeError(
-                'Arg values type[' . (!is_object($values) ? gettype($values) : get_class($values))
-                . '] is not array|object.'
-            );
+            throw new \TypeError('Arg values type[' . Utils::getType($values) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -313,9 +310,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     public function deleteMultiple($keys)
     {
         if (!is_array($keys) && !is_object($keys)) {
-            throw new \TypeError(
-                'Arg keys type[' . (!is_object($keys) ? gettype($keys) : get_class($keys)) . '] is not array|object.'
-            );
+            throw new \TypeError('Arg keys type[' . Utils::getType($keys) . '] is not array|object.');
         }
         if ($this->destroyed) {
             throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
@@ -343,7 +338,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     public function has($key)
     {
-        if (!CacheKey::validate($key)) {
+        if (!$this->validateKey($key)) {
             throw new CacheInvalidArgumentException('Arg key is not valid, key[' . $key . '].');
         }
         if ($this->destroyed) {
@@ -633,6 +628,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                 }
             }
         }
+        ksort($collection);
         return $collection;
     }
 
@@ -694,7 +690,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                         . '] to backup[' . $file_backup . '].'
                     );
                 }
-                if ($file_group_write && !@chmod($file_backup, $file_mode)) {
+                if (
+                    $file_group_write && !@chmod($file_backup, $file_mode)
+                    // Don't err is already group-write, set gid is less important.
+                    && !$utils->isFileGroupWrite(fileperms($file_backup))
+                ) {
                     throw new RuntimeException('Failed to chmod backup file[' . $file_backup . '].');
                 }
                 if ($clone_modified && !@touch($file_backup, $modified)) {
@@ -751,7 +751,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_backup, $dir_original)) {
             throw new RuntimeException('Failed to move backup to store, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_original, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_original, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_original))
+        ) {
             throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
         }
 
@@ -851,7 +855,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_original, $dir_backup)) {
             throw new RuntimeException('Failed to move store to backup, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_backup, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_backup))
+        ) {
             throw new RuntimeException('Failed to chmod backup dir, store[' . $this->name . '].');
         }
 
@@ -859,7 +867,11 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if (!@rename($dir_candidate, $dir_original)) {
             throw new RuntimeException('Failed to move candidate to current, store[' . $this->name . '].');
         }
-        if ($dir_group_write && !@chmod($dir_backup, $filemode_dir)) {
+        if (
+            $dir_group_write && !@chmod($dir_backup, $filemode_dir)
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($dir_backup))
+        ) {
             throw new RuntimeException('Failed to chmod store dir, store[' . $this->name . '].');
         }
 
@@ -931,9 +943,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const TTL_DEFAULT = 30 * 60;
 
     /**
-     * Don't ignore ttl argument of item setters and getters.
-     *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Don't ignore ttl argument of item setters.
      *
      * @var int
      */
@@ -1044,9 +1054,10 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     protected $ttlDefault;
 
     /**
-     * Ignore ttl argument of item setters and getters.
+     * Ignore ttl argument of item setters.
      *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Ignore time-to-live completely,
+     * if ignore AND ttl default is none (forever).
      *
      * Gets set by constructor via resolveSettings().
      * @see FileCache::resolveSettings()
@@ -1122,16 +1133,16 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             );
         }
         if (!CacheKey::validate($name)) {
-            throw new InvalidArgumentException('Arg name is empty or contains illegal char(s), name['
+            // Doesn't use instance method validateKey(), because
+            // KeyLongCacheInterface extender shan't allow longer store name.
+            throw new InvalidArgumentException('Arg name is empty, contains illegal char(s) or has wrong length, name['
                 . $name . '].');
         }
         $this->name = $name;
 
         if (!empty($options['path'])) {
             if (!is_string($options['path'])) {
-                throw new \TypeError('Arg options[path] type['
-                    . (!is_object($options['path']) ? gettype($options['path']) :
-                        get_class($options['path'])) . '] is not string.');
+                throw new \TypeError('Arg options[path] type[' . Utils::getType($options['path']) . '] is not string.');
             }
             $this->path = $options['path'];
         } else {
@@ -1154,6 +1165,78 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         if ($save_settings) {
             $this->saveSettings($settings);
         }
+    }
+
+    /**
+     * @uses CacheKey::validate()
+     *
+     * @param string $key
+     *
+     * @return bool
+     */
+    public function validateKey(string $key)
+    {
+        return CacheKey::validate($key);
+    }
+
+    /**
+     * Average, and not exact; doesn't consider the year-divisible-by-400 rule.
+     *
+     * @var float
+     */
+    const DAYS_OF_YEAR = 365.25;
+
+    /**
+     * Flawed leap year implementation; uses an average, doesn't check if any
+     * of current year(s) is leap year.
+     *
+     * @param int|\DateInterval|null $ttl
+     *      Non-empty must be non-negative.
+     *
+     * @return int
+     *      Seconds.
+     *
+     * @throws \TypeError
+     * @throws RuntimeException
+     *      Arg ttl resolves to negative integer.
+     */
+    public function timeToLive($ttl) : int
+    {
+        if ($ttl) {
+            if (is_int($ttl)) {
+                if ($ttl < 0) {
+                    throw new RuntimeException('Time-to-live cannot be negative, saw int[' . $ttl . '].');
+                }
+                return $ttl;
+            }
+            if (is_a($ttl, \DateInterval::class)) {
+                $secs = (int) floor(
+                        + ($ttl->y * static::DAYS_OF_YEAR * 24 * 60 * 60)
+                        + ($ttl->m * (static::DAYS_OF_YEAR / 12) * 24 * 60 * 60)
+                        + ($ttl->d * 24 * 60 * 60)
+                        + ($ttl->h * 60 * 60)
+                        + ($ttl->i * 60)
+                        + $ttl->s
+                    ) * (!$ttl->invert ? 1 : -1);
+                if ($secs < 0) {
+                    throw new RuntimeException('Time-to-live cannot be negative, saw DateInterval['
+                        . join(', ', array(
+                            'y' => $ttl->y,
+                            'm' => $ttl->m,
+                            'd' => $ttl->d,
+                            'h' => $ttl->h,
+                            'i' => $ttl->i,
+                            's' => $ttl->s,
+                            'invert' => $ttl->invert,
+                        ))
+                        . '].'
+                    );
+                }
+                return $secs;
+            }
+            throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
+        }
+        return 0;
     }
 
     /**
@@ -1215,9 +1298,9 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
             // empty() also handles null;
             // that existing setting (or class default) must rule.
             if (!is_string($options['fileMode'])) {
-                throw new \TypeError('Arg options[fileMode] type['
-                    . (!is_object($options['fileMode']) ? gettype($options['fileMode']) :
-                        get_class($options['fileMode'])) . '] is not string.');
+                throw new \TypeError(
+                    'Arg options[fileMode] type[' . Utils::getType($options['fileMode']) . '] is not string.'
+                );
             }
             switch ($options['fileMode']) {
                 case 'user':
@@ -1348,77 +1431,21 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      */
     protected function saveSettings(array $settings) /*: void*/
     {
+        $utils = Utils::getInstance();
         $file = $this->pathReal . '/' . $this->name . '.ini';
-        $content = Utils::getInstance()->containerToIniString($settings);
+        $content = $utils->containerToIniString($settings);
         $set_mode = $this->fileMode != 'user' && !file_exists($file);
         if (!file_put_contents($file, $content)) {
             throw new RuntimeException('Failed to write store settings to file[' . $file . '].');
         }
-        if ($set_mode) {
-            if (!chmod($file, static::FILE_MODE['file_' . $this->fileMode])) {
-                throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
-            }
+        if (
+            $set_mode
+            && !@chmod($file, static::FILE_MODE['file_' . $this->fileMode])
+            // Don't err is already group-write, set gid is less important.
+            && !$utils->isFileGroupWrite(fileperms($file))
+        ) {
+            throw new RuntimeException('Failed to chmod settings file[' . $file . '].');
         }
-    }
-
-    /**
-     * Average, and not exact; doesn't consider the year-divisible-by-400 rule.
-     *
-     * @var float
-     */
-    const DAYS_OF_YEAR = 365.25;
-
-    /**
-     * Flawed leap year implementation; uses an average, doesn't check if any
-     * of current year(s) is leap year.
-     *
-     * @param int|\DateInterval|null $ttl
-     *      Non-empty must be non-negative.
-     *
-     * @return int
-     *      Seconds.
-     *
-     * @throws \TypeError
-     * @throws RuntimeException
-     *      Arg ttl resolves to negative integer.
-     */
-    protected function timeToLive($ttl) : int
-    {
-        if ($ttl) {
-            if (is_int($ttl)) {
-                if ($ttl < 0) {
-                    throw new RuntimeException('Time-to-live cannot be negative, saw int[' . $ttl . '].');
-                }
-                return $ttl;
-            }
-            if (is_a($ttl, \DateInterval::class)) {
-                $secs = (int) floor(
-                        + ($ttl->y * static::DAYS_OF_YEAR * 24 * 60 * 60)
-                        + ($ttl->m * (static::DAYS_OF_YEAR / 12) * 24 * 60 * 60)
-                        + ($ttl->d * 24 * 60 * 60)
-                        + ($ttl->h * 60 * 60)
-                        + ($ttl->i * 60)
-                        + $ttl->s
-                    ) * (!$ttl->invert ? 1 : -1);
-                if ($secs < 0) {
-                    throw new RuntimeException('Time-to-live cannot be negative, saw DateInterval['
-                        . join(', ', array(
-                            'y' => $ttl->y,
-                            'm' => $ttl->m,
-                            'd' => $ttl->d,
-                            'h' => $ttl->h,
-                            'i' => $ttl->i,
-                            's' => $ttl->s,
-                            'invert' => $ttl->invert,
-                        ))
-                        . '].'
-                    );
-                }
-                return $secs;
-            }
-            throw new \TypeError('Time-to-live must be integer, DateInterval or null.');
-        }
-        return 0;
     }
 
     /**

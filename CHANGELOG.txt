@@ -1,3 +1,36 @@
+SimpleComplex/Cache 1.x, 2017-09-24
+-----------------------------------
+- Release 1.1.
+
+SimpleComplex/Cache 1.x, 2017-09-02
+-----------------------------------
+- Interface, key validator and FileCache extenders which allow longer item key;
+  max. length 128 versus PSR-16 Simple Cache 64.
+- Interfaces for fixed time-to-live and persistent.
+- FileCache timeToLive() method public.
+
+SimpleComplex/Cache 1.x, 2017-08-30
+-----------------------------------
+- README supposedly complete.
+
+SimpleComplex/Cache 1.x, 2017-08-27
+-----------------------------------
+- CLI command cache-list-stores renamed; from cache-list.
+- CLI command cache-list-stores optional 'match' argument.
+- FileCache no longer errs if failing to chmod() to group-write, if the dir/file
+  already is group-write; setting gid is less important.
+
+SimpleComplex/Cache 1.x, 2017-07-24
+-----------------------------------
+- CLI commands must respect new command 'silent' property.
+- CLI 'get' command default to print instead default to return the value.
+- CLI 'list' command lists cache store names.
+- Export must sort items by key, to produce idempotent (repeatable) list.
+
+SimpleComplex/Cache 1.x, 2017-07-20
+-----------------------------------
+- Cli script find vendor dir fix.
+
 SimpleComplex/Cache 1.x, 2017-07-12
 -----------------------------------
 - Release 1.0.

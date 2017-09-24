@@ -9,6 +9,8 @@ declare(strict_types=1);
 
 namespace SimpleComplex\Cache;
 
+use SimpleComplex\Cache\Interfaces\PersistentCacheInterface;
+
 /**
  * PSR-16 Simple Cache file-based
  * with time-to-live forever and arg ttl ignored.
@@ -22,10 +24,10 @@ namespace SimpleComplex\Cache;
  *
  * @package SimpleComplex\Cache
  */
-class PersistentFileCache extends FileCache
+class PersistentFileCache extends FileCache implements PersistentCacheInterface
 {
     /**
-     * Default time-to-live: zero.
+     * Default time-to-live: zero (forever).
      *
      * Values:
      * - zero: forever.
@@ -36,9 +38,7 @@ class PersistentFileCache extends FileCache
     const TTL_DEFAULT = 0;
 
     /**
-     * Ignore ttl argument of item setters and getters.
-     *
-     * Ignore time-to-live completely, if ignore AND ttl default none (forever).
+     * Ignore ttl argument of item setters.
      *
      * @var int
      */
