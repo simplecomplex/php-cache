@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2017-09-24
+-----------------------------------
+- Release 1.1.
+
 SimpleComplex/Cache 1.x, 2017-09-02
 -----------------------------------
 - Interface, key validator and FileCache extenders which allow longer item key;
