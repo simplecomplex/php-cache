@@ -1,3 +1,7 @@
+SimpleComplex/Cache 1.x, 2018-04-07
+-----------------------------------
+- Release 1.2.
+
 SimpleComplex/Cache 1.x, 2018-03-26
 -----------------------------------
 - Don't support group-write on non posix compliant file system (Windows).
