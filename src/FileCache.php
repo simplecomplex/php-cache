@@ -895,6 +895,13 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
     const PATH_DEFAULT = '../private/lib/simplecomplex/file-cache';
 
     /**
+     * Posix compliant (non-Windows) file system.
+     *
+     * @var bool
+     */
+    const FILE_SYSTEM_POSIX = DIRECTORY_SEPARATOR == '/';
+
+    /**
      * File modes for directory/file writing, using respectively user-only,
      * group read/write/execute and group plus set group id.
      *
@@ -914,6 +921,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
 
     /**
      * Values: user|group|group_setgid.
+     *
+     * File mode is alway 'user' on non posix compliant (Windows) file system.
      *
      * @var string
      */
@@ -1317,6 +1326,9 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
                         'Arg fileMode must be user|group|group_setgid or empty, fileMode[' . $options['fileMode'] . '].'
                     );
             }
+        }
+        if (!static::FILE_SYSTEM_POSIX) {
+            $this->fileMode = 'user';
         }
 
         // ttlDefault.
