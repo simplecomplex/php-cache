@@ -21,7 +21,7 @@ use SimpleComplex\Cache\Exception\RuntimeException;
  * allowing change of cache implementation and medium without consequences
  * to code using the CacheBroker.
  *
- * @dependency-injection-container cache-broker
+ * @dependency-injection-container-id cache-broker
  *      Suggested ID of the CacheBroker instance.
  *
  * All registered stores are accessible via 'magic' getters.
