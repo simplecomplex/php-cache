@@ -373,6 +373,131 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
         return true;
     }
 
+    /**
+     * List keys of a store, optionally list of end-of-life by key.
+     *
+     * @param int $expired
+     *      Zero: skip expired items.
+     *      One: expireds only.
+     *      Two: all.
+     * @param int $limit
+     *      Zero|-1: no limit.
+     * @param bool|string $endOfLife
+     *      False or empty string: don't list end-of-life time.
+     *      String: date() format; 'c' for ISO-8601; will become dash
+     *          if the cache store is persistent.
+     *
+     * @return array
+     *      if !$endOfLife: numerically indexed list of key names.
+     *      Otherwise associative key => modified-time.
+     *
+     * @throws \InvalidArgumentException
+     *      Arg expired not 0|1|2.
+     *      Arg limit less than -1.
+     * @throws \TypeError
+     *      Arg getModifiedTime isn't bool|string.
+     */
+    public function listKeys(int $expired = 0, int $limit = 0, $endOfLife = false)
+    {
+        /**
+         * NB: $endOfLife must be last parameter, because empty string is valid
+         * argument; and that won't work well as early CLI argument (unless '').
+         * @see CliCache::cmdListStores()
+         */
+
+        if ($this->destroyed) {
+            throw new RuntimeException('This cache store is destroyed, store[' . $this->name . '].');
+        }
+
+        $absolute_path = $this->pathReal . '/stores/' . $this->name;
+        if (!file_exists($absolute_path)) {
+            return [];
+        }
+
+        $time = 0;
+        if (!$this->ttlDefault && $this->ttlIgnore) {
+            if ($expired == 1) {
+                // No expireds if persistent cache.
+                return [];
+            }
+            $persistent = true;
+            $xprd = 2;
+        }
+        else {
+            $persistent = false;
+            if (!$expired) {
+                $xprd = 0;
+                $time = time();
+            }
+            elseif ($expired < 0 || $expired > 2) {
+                throw new \InvalidArgumentException('Arg expired[' . $expired . '] isn\'t 0|1|2.');
+            }
+            elseif ($expired == 1) {
+                $xprd = 1;
+                $time = time();
+            }
+            else {
+                $xprd = 2;
+            }
+        }
+
+        if ($limit < -1) {
+            throw new \InvalidArgumentException('Arg limit[' . $limit . '] cannot be less than -1.');
+        }
+        $lmt = $limit < 1 ? 0 : $limit;
+
+        if (!$endOfLife) {
+            $m_time = '';
+        }
+        elseif ($endOfLife === true) {
+            $m_time = 'U';
+        }
+        elseif (!is_string($endOfLife)) {
+            throw new \TypeError(
+                'Arg getModifiedTime type[' . Utils::getType($endOfLife) . '] isn\'t bool|string.'
+            );
+        }
+        else {
+            $m_time = $endOfLife;
+        }
+
+        $list = [];
+        $iterator = new \FilesystemIterator(
+            $absolute_path,
+            \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::UNIX_PATHS
+        );
+        $i = 0;
+        foreach ($iterator as $item) {
+            if ($lmt && $i >= $lmt) {
+                break;
+            }
+            if ($xprd == 2 && !$m_time) {
+                $list[] = $item->getFilename();
+                ++$i;
+            }
+            elseif ($persistent) {
+                $list[$item->getFilename()] = '-';
+                ++$i;
+            }
+            else {
+                $end_of_life = $item->getMTime();
+                if ($xprd == 2) {
+                    $list[$item->getFilename()] = $m_time == 'U' ? $end_of_life : date($m_time, $end_of_life);
+                    ++$i;
+                }
+                elseif (($xprd == 1 && $end_of_life < $time) || (!$xprd && $end_of_life >= $time)) {
+                    if (!$m_time) {
+                        $list[] = $item->getFilename();
+                    } else {
+                        $list[$item->getFilename()] = $m_time == 'U' ? $end_of_life : date($m_time, $end_of_life);
+                    }
+                    ++$i;
+                }
+            }
+        }
+        return $list;
+    }
+
 
     // Explorable.--------------------------------------------------------------
 

@@ -75,6 +75,23 @@ class CliCache implements CliCommandInterface
             ),
             new CliCommand(
                 $this,
+                static::COMMAND_PROVIDER_ALIAS . '-list-keys',
+                'List cache item keys of a store.',
+                [
+                    'store' => 'Cache store name.',
+                    'expired' => 'Zero: skip expireds | 1: expireds only | 2: all, expired or not.',
+                    'limit' => 'First N keys, zero means no limit.',
+                    'end-of-life' => 'Non-empty string: list end-of-life time, using this arg as date() format; U for Unix Epoch, c for ISO-8601. Becomes dash if persistent cache.',
+                ],
+                [
+                    'get' => 'Return comma-separated list, don\'t print.',
+                ],
+                [
+                    'g' => 'get',
+                ]
+            ),
+            new CliCommand(
+                $this,
                 static::COMMAND_PROVIDER_ALIAS . '-get',
                 'Get a cache item.',
                 [
@@ -254,6 +271,138 @@ class CliCache implements CliCommandInterface
             return join(',', $names);
         }
         $this->environment->echoMessage(join("\n", $names));
+        exit;
+    }
+
+    /**
+     * @see FileCache::listKeys()
+     *
+     * @return string
+     *      Newline-delimited if argument modified-time.
+     */
+    protected function cmdListKeys()
+    {
+        /**
+         * @see simplecomplex_cache_cli()
+         */
+        $container = Dependency::container();
+        // Validate input. ---------------------------------------------
+        $store = '';
+        if (empty($this->command->arguments['store'])) {
+            $this->command->inputErrors[] = !isset($this->command->arguments['store']) ? 'Missing \'store\' argument.' :
+                'Empty \'store\' argument.';
+        } else {
+            $store = $this->command->arguments['store'];
+            if (!CacheKey::validate($store)) {
+                $this->command->inputErrors[] = 'Invalid \'store\' argument.';
+            }
+        }
+        $expired = 0;
+        if (!empty($this->command->arguments['expired'])) {
+            if (!ctype_digit('' . $this->command->arguments['expired'])) {
+                $this->command->inputErrors[] = 'Invalid \'expired\' argument, must be 0|1|2.';
+            } else {
+                $expired = (int) $this->command->arguments['expired'];
+                switch ($expired) {
+                    case 0:
+                    case 1:
+                    case 2:
+                        break;
+                    default:
+                        $this->command->inputErrors[] = 'Invalid \'expired\' argument, must be 0|1|2.';
+                }
+            }
+        }
+        $limit = 0;
+        if (!empty($this->command->arguments['limit'])) {
+            if (!ctype_digit('' . $this->command->arguments['limit'])) {
+                $this->command->inputErrors[] = 'Invalid \'limit\' argument, must be digit(s).';
+            } else {
+                $limit = (int) $this->command->arguments['limit'];
+                if ($limit < 0) {
+                    if ($limit == -1) {
+                        $limit = 0;
+                    } else {
+                        $this->command->inputErrors[] = 'Invalid \'limit\' argument, cannot be less than.';
+                    }
+                }
+            }
+        }
+        $end_of_life = '';
+        if (!empty($this->command->arguments['end-of-life'])) {
+            $end_of_life = $this->command->arguments['end-of-life'];
+        }
+
+        $get = !empty($this->command->options['get']);
+        if ($get && $end_of_life) {
+            $this->command->inputErrors[] = 'Option \'get\' is not compatible with non-empty argument end-of-life.';
+        }
+
+        if ($this->command->inputErrors) {
+            foreach ($this->command->inputErrors as $msg) {
+                $this->environment->echoMessage(
+                    $this->environment->format($msg, 'hangingIndent'),
+                    'notice'
+                );
+            }
+            // This command's help text.
+            $this->environment->echoMessage("\n" . $this->command);
+            exit;
+        }
+        // Check if the command is doable.------------------------------
+        // Does that store exist?
+        if ($container->has('cache-broker')) {
+            /** @var CacheBroker $cache_broker */
+            $cache_broker_class = get_class($container->get('cache-broker'));
+        } else {
+            $cache_broker_class = static::CLASS_CACHE_BROKER;
+        }
+        $cache_class = constant($cache_broker_class . '::CACHE_CLASSES')[CacheBroker::CACHE_BASE];
+        if (!method_exists($cache_class, 'listInstances')) {
+            $this->environment->echoMessage('Cannot retrieve list of cache store instances via class['
+                . $cache_class . '], has no static method listInstances().', 'error');
+            exit;
+        }
+        $stores = forward_static_call($cache_class . '::listInstances');
+        $cache_store = null;
+        foreach ($stores as $instance) {
+            if ($instance->name == $store) {
+                /** @var ManageableCacheInterface $cache_store */
+                $cache_store = $instance;
+                break;
+            }
+        }
+        if (!$cache_store) {
+            $this->environment->echoMessage('');
+            $this->environment->echoMessage('That cache store doesn\'t exist, store[' . $store . '].', 'warning');
+            exit;
+        }
+
+        // Check that cache store class has listKeys() method
+        // isn't an interface requirement.
+        if (!method_exists($cache_store, 'listKeys')) {
+            $this->environment->echoMessage('Cache store[' . $store . '] class[' . get_class($cache_store)
+                . '] has no method listKeys().', 'error');
+            exit;
+        }
+
+        /**
+         * @see FileCache::listKeys()
+         */
+        $cache_keys = $cache_store->listKeys($expired, $limit, $end_of_life);
+        if (!$end_of_life) {
+            if ($get) {
+                return join(',', $cache_keys);
+            }
+            $this->environment->echoMessage(join("\n", $cache_keys));
+        }
+        else {
+            $buffer = '';
+            foreach ($cache_keys as $key => $end_time) {
+                $buffer .= $key . ': ' . $end_time . "\n";
+            }
+            $this->environment->echoMessage(rtrim($buffer));
+        }
         exit;
     }
 
@@ -1104,6 +1253,8 @@ class CliCache implements CliCommandInterface
         switch ($command->name) {
             case static::COMMAND_PROVIDER_ALIAS . '-list-stores':
                 return $this->cmdListStores();
+            case static::COMMAND_PROVIDER_ALIAS . '-list-keys':
+                return $this->cmdListKeys();
             case static::COMMAND_PROVIDER_ALIAS . '-get':
                 return $this->cmdGet();
             case static::COMMAND_PROVIDER_ALIAS . '-delete':
