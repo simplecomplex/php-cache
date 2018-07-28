@@ -1,7 +1,8 @@
 SimpleComplex/Cache 1.x, 2018-07-28
 -----------------------------------
-- Register CLI command provider in document root .ini file;
-  don't provide own cli.phpsh.
+- Register CLI command provider in document root .ini file.
+  And don't provide own cli.phpsh; rely on the Utils' package's generic
+  cli.phpsh.
 
 SimpleComplex/Cache 1.x, 2018-06-17
 -----------------------------------
