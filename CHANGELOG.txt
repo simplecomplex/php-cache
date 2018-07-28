@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2018-07-28
+-----------------------------------
+- Register CLI command provider in document root .ini file;
+  don't provide own cli.phpsh.
+
 SimpleComplex/Cache 1.x, 2018-06-17
 -----------------------------------
 - FileCache listKeys() and CLI cache-list-keys.
