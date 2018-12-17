@@ -191,8 +191,8 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *
      * @code
      * # CLI
-     * cd vendor/simplecomplex/cache/src/cli
-     * php cli.phpsh cache -h
+     * cd vendor/simplecomplex/utils/src/cli
+     * php cli.php cache -h
      * @endcode
      *
      * @param string $key
@@ -659,7 +659,7 @@ class FileCache extends Explorable implements ManageableCacheInterface, BackupCa
      *
      * Use a cron job to do this.
      * @code
-     * php [document root]/vendor/simplecomplex/cache/src/cli/cli.phpsh cache-clear-expired --all --yes
+     * php [document root]/vendor/simplecomplex/cache/src/cli/cli.php cache-clear-expired --all --yes
      * @endcode
      *
      * @see simplecomplex_cache_cli()
