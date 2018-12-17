@@ -96,33 +96,33 @@ $whatever = $cache_store->get('some-key', 'the default value');
 
 ```bash
 # List all cache commands and their help.
-php cli.phpsh cache -h
+php cli.php cache -h
 # One command's help.
-php cli.phpsh cache-xxx -h
+php cli.php cache-xxx -h
 
 # List existing cache stores.
-php cli.phpsh cache-list-stores
+php cli.php cache-list-stores
 
 # Display/get value of a cache item.
-php cli.phpsh cache-get store key
+php cli.php cache-get store key
 
 # Delete a cache item.
-php cli.phpsh cache-delete store key
+php cli.php cache-delete store key
 
 # Delete all expired items of one or all cache stores.
-php cli.phpsh cache-clear-expired
+php cli.php cache-clear-expired
 
 # Delete all items of one or all cache stores.
-php cli.phpsh cache-clear
+php cli.php cache-clear
 
 # Backup a cache store.
-php cli.phpsh cache-backup store
+php cli.php cache-backup store
 
 # Restore a cache store from backup.
-php cli.phpsh cache-restore store
+php cli.php cache-restore store
 
 # Destroy one or all cache stores.
-php cli.phpsh cache-destroy
+php cli.php cache-destroy
 ```
 
 ### Installation ###

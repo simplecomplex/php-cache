@@ -31,8 +31,8 @@ use SimpleComplex\Cache\Interfaces\BackupCacheInterface;
  *
  * @code
  * # CLI
- * cd vendor/simplecomplex/cache/src/cli
- * php cli.phpsh cache -h
+ * cd vendor/simplecomplex/utils/src/cli
+ * php cli.php cache -h
  * @endcode
  *
  * @package SimpleComplex\Cache
