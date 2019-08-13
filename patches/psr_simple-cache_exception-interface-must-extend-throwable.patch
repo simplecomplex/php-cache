@@ -1,0 +1,13 @@
+--- a/CacheException.php	2019-08-13 09:52:35.746553335 +0200
++++ b/CacheException.php	2019-08-13 09:54:39.630321268 +0200
+@@ -4,7 +4,9 @@
+
+ /**
+  * Interface used for all types of exceptions thrown by the implementing library.
++ *
++ * An exception interface must extend Throwable (fix).
+  */
+-interface CacheException
++interface CacheException extends \Throwable
+ {
+ }
