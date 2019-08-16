@@ -1,3 +1,8 @@
+SimpleComplex/Cache 1.x, 2019-08-13
+-----------------------------------
+- Patch \Psr\SimpleCache\CacheException to make it extend \Throwable.
+  Any exception interface should extend Throwable.
+
 SimpleComplex/Cache 1.x, 2018-07-29
 -----------------------------------
 - Register CLI command provider in document root .ini file.
