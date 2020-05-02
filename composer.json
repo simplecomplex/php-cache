@@ -13,6 +13,7 @@
     ],
     "require": {
         "php": ">=7.0",
+        "ext-ctype": "*",
         "psr/simple-cache": "^1.0 || dev-develop",
         "simplecomplex/utils": "^1.8 || ^2.0 || dev-develop"
     },
